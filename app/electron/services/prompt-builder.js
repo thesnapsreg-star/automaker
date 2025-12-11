@@ -52,11 +52,11 @@ ${memoryContent}
 **Current Feature to Implement:**
 
 ID: ${feature.id}
-Category: ${feature.category}
-Description: ${feature.description}
+Category: ${feature.category || "Uncategorized"}
+Description: ${feature.description || feature.summary || feature.title || "No description provided"}
 ${skipTestsNote}${imagesNote}${contextFilesPreview}
 **Steps to Complete:**
-${feature.steps.map((step, i) => `${i + 1}. ${step}`).join("\n")}
+${(feature.steps || []).map((step, i) => `${i + 1}. ${step}`).join("\n") || "No specific steps provided - implement based on description"}
 
 **Your Task:**
 
@@ -195,12 +195,12 @@ ${memoryContent}
 **Feature to Implement/Verify:**
 
 ID: ${feature.id}
-Category: ${feature.category}
-Description: ${feature.description}
+Category: ${feature.category || "Uncategorized"}
+Description: ${feature.description || feature.summary || feature.title || "No description provided"}
 Current Status: ${feature.status}
 ${skipTestsNote}${imagesNote}${contextFilesPreview}
 **Steps that should be implemented:**
-${feature.steps.map((step, i) => `${i + 1}. ${step}`).join("\n")}
+${(feature.steps || []).map((step, i) => `${i + 1}. ${step}`).join("\n") || "No specific steps provided - implement based on description"}
 
 **Your Task:**
 
@@ -335,11 +335,11 @@ ${memoryContent}
 **Current Feature:**
 
 ID: ${feature.id}
-Category: ${feature.category}
-Description: ${feature.description}
+Category: ${feature.category || "Uncategorized"}
+Description: ${feature.description || feature.summary || feature.title || "No description provided"}
 ${skipTestsNote}${imagesNote}${contextFilesPreview}
 **Steps to Complete:**
-${feature.steps.map((step, i) => `${i + 1}. ${step}`).join("\n")}
+${(feature.steps || []).map((step, i) => `${i + 1}. ${step}`).join("\n") || "No specific steps provided - implement based on description"}
 
 **Previous Work Context:**
 

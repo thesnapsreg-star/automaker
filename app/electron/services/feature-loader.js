@@ -170,14 +170,38 @@ class FeatureLoader {
         const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
 
         try {
+          // Read feature.json directly - handle ENOENT in catch block
+          // This avoids TOCTOU race condition from checking with fs.access first
           const content = await fs.readFile(featureJsonPath, "utf-8");
           const feature = JSON.parse(content);
+          
+          // Validate that the feature has required fields
+          if (!feature.id) {
+            console.warn(
+              `[FeatureLoader] Feature ${featureId} missing required 'id' field, skipping`
+            );
+            continue;
+          }
+          
           features.push(feature);
         } catch (error) {
-          console.error(
-            `[FeatureLoader] Failed to load feature ${featureId}:`,
-            error
-          );
+          // Handle different error types appropriately
+          if (error.code === "ENOENT") {
+            // File doesn't exist - this is expected for incomplete feature directories
+            // Skip silently (feature.json not yet created or was removed)
+            continue;
+          } else if (error instanceof SyntaxError) {
+            // JSON parse error - log as warning since file exists but is malformed
+            console.warn(
+              `[FeatureLoader] Failed to parse feature.json for ${featureId}: ${error.message}`
+            );
+          } else {
+            // Other errors - log as error
+            console.error(
+              `[FeatureLoader] Failed to load feature ${featureId}:`,
+              error.message || error
+            );
+          }
           // Continue loading other features
         }
       }
@@ -339,30 +363,93 @@ class FeatureLoader {
   /**
    * Update feature status (legacy API)
    * Features are stored in .automaker/features/{id}/feature.json
+   * Creates the feature if it doesn't exist.
    * @param {string} featureId - The ID of the feature to update
    * @param {string} status - The new status
    * @param {string} projectPath - Path to the project
-   * @param {string} [summary] - Optional summary of what was done
-   * @param {string} [error] - Optional error message if feature errored
+   * @param {Object} options - Options object for optional parameters
+   * @param {string} [options.summary] - Optional summary of what was done
+   * @param {string} [options.error] - Optional error message if feature errored
+   * @param {string} [options.description] - Optional detailed description
+   * @param {string} [options.category] - Optional category/phase
+   * @param {string[]} [options.steps] - Optional array of implementation steps
    */
-  async updateFeatureStatus(featureId, status, projectPath, summary, error) {
+  async updateFeatureStatus(featureId, status, projectPath, options = {}) {
+    const { summary, error, description, category, steps } = options;
+    // Check if feature exists
+    const existingFeature = await this.get(projectPath, featureId);
+    
+    if (!existingFeature) {
+      // Feature doesn't exist - create it with all required fields
+      console.log(`[FeatureLoader] Feature ${featureId} not found - creating new feature`);
+      const newFeature = {
+        id: featureId,
+        title: featureId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+        description: description || summary || '', // Use provided description, fall back to summary
+        category: category || "Uncategorized",
+        steps: steps || [],
+        status: status,
+        images: [],
+        imagePaths: [],
+        skipTests: false, // Auto-generated features should run tests by default
+        model: "sonnet",
+        thinkingLevel: "none",
+        summary: summary || description || '',
+        createdAt: new Date().toISOString(),
+      };
+      if (error !== undefined) {
+        newFeature.error = error;
+      }
+      await this.create(projectPath, newFeature);
+      console.log(
+        `[FeatureLoader] Created feature ${featureId}: status=${status}, category=${category || "Uncategorized"}, steps=${steps?.length || 0}${
+          summary ? `, summary="${summary}"` : ""
+        }`
+      );
+      return;
+    }
+
+    // Feature exists - update it
     const updates = { status };
     if (summary !== undefined) {
       updates.summary = summary;
+      // Also update description if it's empty or not set
+      if (!existingFeature.description) {
+        updates.description = summary;
+      }
+    }
+    if (description !== undefined) {
+      updates.description = description;
+    }
+    if (category !== undefined) {
+      updates.category = category;
+    }
+    if (steps !== undefined && Array.isArray(steps)) {
+      updates.steps = steps;
     }
     if (error !== undefined) {
       updates.error = error;
     } else {
       // Clear error if not provided
-      const feature = await this.get(projectPath, featureId);
-      if (feature && feature.error) {
+      if (existingFeature.error) {
         updates.error = undefined;
       }
     }
+    
+    // Ensure required fields exist (for features created before this fix)
+    if (!existingFeature.category && !updates.category) updates.category = "Uncategorized";
+    if (!existingFeature.steps && !updates.steps) updates.steps = [];
+    if (!existingFeature.images) updates.images = [];
+    if (!existingFeature.imagePaths) updates.imagePaths = [];
+    if (existingFeature.skipTests === undefined) updates.skipTests = false;
+    if (!existingFeature.model) updates.model = "sonnet";
+    if (!existingFeature.thinkingLevel) updates.thinkingLevel = "none";
 
     await this.update(projectPath, featureId, updates);
     console.log(
       `[FeatureLoader] Updated feature ${featureId}: status=${status}${
+        category ? `, category="${category}"` : ""
+      }${steps ? `, steps=${steps.length}` : ""}${
         summary ? `, summary="${summary}"` : ""
       }`
     );

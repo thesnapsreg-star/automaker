@@ -257,6 +257,11 @@ export interface SpecRegenerationAPI {
     error?: string;
   }>;
 
+  generateFeatures: (projectPath: string) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+
   stop: () => Promise<{
     success: boolean;
     error?: string;
@@ -265,6 +270,7 @@ export interface SpecRegenerationAPI {
   status: () => Promise<{
     success: boolean;
     isRunning?: boolean;
+    currentPhase?: string;
     error?: string;
   }>;
 
