@@ -5,7 +5,9 @@
 
 import { Router, type Request, type Response } from "express";
 import fs from "fs/promises";
+import os from "os";
 import path from "path";
+import os from "os";
 import { validatePath, addAllowedPath, isPathAllowed } from "../lib/security.js";
 import type { EventEmitter } from "../lib/events.js";
 
@@ -370,6 +372,82 @@ export function createFsRoutes(_events: EventEmitter): Router {
     }
   });
 
+  // Browse directories - for file browser UI
+  router.post("/browse", async (req: Request, res: Response) => {
+    try {
+      const { dirPath } = req.body as { dirPath?: string };
+
+      // Default to home directory if no path provided
+      const targetPath = dirPath ? path.resolve(dirPath) : os.homedir();
+
+      // Detect available drives on Windows
+      const detectDrives = async (): Promise<string[]> => {
+        if (os.platform() !== "win32") {
+          return [];
+        }
+
+        const drives: string[] = [];
+        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        for (const letter of letters) {
+          const drivePath = `${letter}:\\`;
+          try {
+            await fs.access(drivePath);
+            drives.push(drivePath);
+          } catch {
+            // Drive doesn't exist, skip it
+          }
+        }
+
+        return drives;
+      };
+
+      try {
+        const stats = await fs.stat(targetPath);
+
+        if (!stats.isDirectory()) {
+          res.status(400).json({ success: false, error: "Path is not a directory" });
+          return;
+        }
+
+        // Read directory contents
+        const entries = await fs.readdir(targetPath, { withFileTypes: true });
+
+        // Filter for directories only and add parent directory option
+        const directories = entries
+          .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+          .map((entry) => ({
+            name: entry.name,
+            path: path.join(targetPath, entry.name),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        // Get parent directory
+        const parentPath = path.dirname(targetPath);
+        const hasParent = parentPath !== targetPath;
+
+        // Get available drives
+        const drives = await detectDrives();
+
+        res.json({
+          success: true,
+          currentPath: targetPath,
+          parentPath: hasParent ? parentPath : null,
+          directories,
+          drives,
+        });
+      } catch (error) {
+        res.status(400).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to read directory",
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
   // Serve image files
   router.get("/image", async (req: Request, res: Response) => {
     try {
@@ -416,6 +494,124 @@ export function createFsRoutes(_events: EventEmitter): Router {
       res.setHeader("Content-Type", mimeTypes[ext] || "application/octet-stream");
       res.setHeader("Cache-Control", "public, max-age=3600");
       res.send(buffer);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  // Browse directories for file picker
+  // SECURITY: Restricted to home directory, allowed paths, and drive roots on Windows
+  router.post("/browse", async (req: Request, res: Response) => {
+    try {
+      const { dirPath } = req.body as { dirPath?: string };
+      const homeDir = os.homedir();
+
+      // Detect available drives on Windows
+      const detectDrives = async (): Promise<string[]> => {
+        if (os.platform() !== "win32") {
+          return [];
+        }
+
+        const drives: string[] = [];
+        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        for (const letter of letters) {
+          const drivePath = `${letter}:\\`;
+          try {
+            await fs.access(drivePath);
+            drives.push(drivePath);
+          } catch {
+            // Drive doesn't exist, skip it
+          }
+        }
+
+        return drives;
+      };
+
+      // Check if a path is safe to browse
+      const isSafePath = (targetPath: string): boolean => {
+        const resolved = path.resolve(targetPath);
+        const normalizedHome = path.resolve(homeDir);
+
+        // Allow browsing within home directory
+        if (resolved === normalizedHome || resolved.startsWith(normalizedHome + path.sep)) {
+          return true;
+        }
+
+        // Allow browsing already-allowed paths
+        if (isPathAllowed(resolved)) {
+          return true;
+        }
+
+        // On Windows, allow drive roots for initial navigation
+        if (os.platform() === "win32") {
+          const driveRootMatch = /^[A-Z]:\\$/i.test(resolved);
+          if (driveRootMatch) {
+            return true;
+          }
+        }
+
+        // On Unix, allow root for initial navigation (but only list, not read files)
+        if (os.platform() !== "win32" && resolved === "/") {
+          return true;
+        }
+
+        return false;
+      };
+
+      // Default to home directory if no path provided
+      const targetPath = dirPath ? path.resolve(dirPath) : homeDir;
+
+      // Security check: validate the path is safe to browse
+      if (!isSafePath(targetPath)) {
+        res.status(403).json({
+          success: false,
+          error: "Access denied: browsing is restricted to your home directory and allowed project paths",
+        });
+        return;
+      }
+
+      try {
+        const stats = await fs.stat(targetPath);
+
+        if (!stats.isDirectory()) {
+          res.status(400).json({ success: false, error: "Path is not a directory" });
+          return;
+        }
+
+        // Read directory contents
+        const entries = await fs.readdir(targetPath, { withFileTypes: true });
+
+        // Filter for directories only and exclude hidden directories
+        const directories = entries
+          .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+          .map((entry) => ({
+            name: entry.name,
+            path: path.join(targetPath, entry.name),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        // Get parent directory (only if parent is also safe to browse)
+        const parentPath = path.dirname(targetPath);
+        const hasParent = parentPath !== targetPath && isSafePath(parentPath);
+
+        // Get available drives on Windows
+        const drives = await detectDrives();
+
+        res.json({
+          success: true,
+          currentPath: targetPath,
+          parentPath: hasParent ? parentPath : null,
+          directories,
+          drives,
+        });
+      } catch (error) {
+        res.status(400).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to read directory",
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       res.status(500).json({ success: false, error: message });

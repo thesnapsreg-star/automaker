@@ -9,3 +9,6 @@ dist/
 .next/
 node_modules
 .automaker/images/
+.automaker/
+/.automaker/*
+/.automaker/

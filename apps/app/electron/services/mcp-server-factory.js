@@ -22,7 +22,7 @@ class McpServerFactory {
           "Create or update a feature. Use this tool to create new features with detailed information or update existing feature status. When creating features, provide comprehensive description, category, and implementation steps.",
           {
             featureId: z.string().describe("The ID of the feature (lowercase, hyphens for spaces). Example: 'user-authentication', 'budget-tracking'"),
-            status: z.enum(["backlog", "todo", "in_progress", "verified"]).describe("The status for the feature. Use 'backlog' or 'todo' for new features."),
+            status: z.enum(["backlog", "todo", "in_progress", "verified"]).describe("The status for the feature. For NEW features, ONLY use 'backlog' or 'verified'. NEVER use 'in_progress' for new features - the user will manually start them."),
             summary: z.string().optional().describe("A brief summary of what was implemented/changed or what the feature does."),
             description: z.string().optional().describe("A detailed description of the feature. Be comprehensive - explain what the feature does, its purpose, and key functionality."),
             category: z.string().optional().describe("The category/phase for this feature. Example: 'Phase 1: Foundation', 'Phase 2: Core Logic', 'Phase 3: Polish', 'Authentication', 'UI/UX'"),
@@ -38,14 +38,16 @@ class McpServerFactory {
               const feature = features.find((f) => f.id === args.featureId);
 
               if (!feature) {
-                console.log(`[Feature Creation] Feature ${args.featureId} not found - this might be a new feature being created`);
-                // This might be a new feature - try to proceed anyway
+                console.log(`[Feature Creation] Feature ${args.featureId} not found - this is a new feature being created`);
+                // This is a new feature - enforce backlog status for any non-verified features
               }
 
               // If agent tries to mark as verified but feature has skipTests=true, convert to waiting_approval
               let finalStatus = args.status;
-              // Convert 'todo' to 'backlog' for consistency, but only for new features
-              if (!feature && finalStatus === "todo") {
+              // For NEW features: Convert 'todo' or 'in_progress' to 'backlog' for consistency
+              // New features should ALWAYS go to backlog first, user must manually start them
+              if (!feature && (finalStatus === "todo" || finalStatus === "in_progress")) {
+                console.log(`[Feature Creation] New feature ${args.featureId} - converting "${finalStatus}" to "backlog" (user must manually start features)`);
                 finalStatus = "backlog";
               }
               if (feature && args.status === "verified" && feature.skipTests === true) {
