@@ -61,6 +61,7 @@ import { KanbanCard } from "./kanban-card";
 import { AgentOutputModal } from "./agent-output-modal";
 import { FeatureSuggestionsDialog } from "./feature-suggestions-dialog";
 import { BoardBackgroundModal } from "@/components/dialogs/board-background-modal";
+import { AddFeatureDialog } from "./board-view/AddFeatureDialog";
 import {
   Plus,
   RefreshCw,
@@ -201,16 +202,6 @@ export function BoardView() {
   const [activeFeature, setActiveFeature] = useState<Feature | null>(null);
   const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newFeature, setNewFeature] = useState({
-    category: "",
-    description: "",
-    steps: [""],
-    images: [] as FeatureImage[],
-    imagePaths: [] as DescriptionImagePath[],
-    skipTests: false,
-    model: "opus" as AgentModel,
-    thinkingLevel: "none" as ThinkingLevel,
-  });
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   const [showOutputModal, setShowOutputModal] = useState(false);
@@ -233,15 +224,12 @@ export function BoardView() {
     DescriptionImagePath[]
   >([]);
   // Preview maps to persist image previews across tab switches
-  const [newFeaturePreviewMap, setNewFeaturePreviewMap] =
-    useState<ImagePreviewMap>(() => new Map());
   const [followUpPreviewMap, setFollowUpPreviewMap] = useState<ImagePreviewMap>(
     () => new Map()
   );
   const [editFeaturePreviewMap, setEditFeaturePreviewMap] =
     useState<ImagePreviewMap>(() => new Map());
   // Local state to temporarily show advanced options when profiles-only mode is enabled
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [showEditAdvancedOptions, setShowEditAdvancedOptions] = useState(false);
   const [showSuggestionsDialog, setShowSuggestionsDialog] = useState(false);
   const [suggestionsCount, setSuggestionsCount] = useState(0);
@@ -251,8 +239,6 @@ export function BoardView() {
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   // Search filter for Kanban cards
   const [searchQuery, setSearchQuery] = useState("");
-  // Validation state for add feature form
-  const [descriptionError, setDescriptionError] = useState(false);
   // Derive spec creation state from store - check if current project is the one being created
   const isCreatingSpec = specCreatingForProject === currentProject?.path;
   const creatingSpecProjectPath = specCreatingForProject;
@@ -589,15 +575,6 @@ export function BoardView() {
     [currentProject, persistedCategories]
   );
 
-  // Sync skipTests default when dialog opens
-  useEffect(() => {
-    if (showAddDialog) {
-      setNewFeature((prev) => ({
-        ...prev,
-        skipTests: defaultSkipTests,
-      }));
-    }
-  }, [showAddDialog, defaultSkipTests]);
 
   // Listen for auto mode feature completion and errors to reload features
   useEffect(() => {
@@ -992,45 +969,24 @@ export function BoardView() {
     }
   };
 
-  const handleAddFeature = () => {
-    // Validate description is required
-    if (!newFeature.description.trim()) {
-      setDescriptionError(true);
-      return;
-    }
-    const category = newFeature.category || "Uncategorized";
-    const selectedModel = newFeature.model;
-    const normalizedThinking = modelSupportsThinking(selectedModel)
-      ? newFeature.thinkingLevel
-      : "none";
+  const handleAddFeature = (featureData: {
+    category: string;
+    description: string;
+    steps: string[];
+    images: FeatureImage[];
+    imagePaths: DescriptionImagePath[];
+    skipTests: boolean;
+    model: AgentModel;
+    thinkingLevel: ThinkingLevel;
+  }) => {
     const newFeatureData = {
-      category,
-      description: newFeature.description,
-      steps: newFeature.steps.filter((s) => s.trim()),
+      ...featureData,
       status: "backlog" as const,
-      images: newFeature.images,
-      imagePaths: newFeature.imagePaths,
-      skipTests: newFeature.skipTests,
-      model: selectedModel,
-      thinkingLevel: normalizedThinking,
     };
     const createdFeature = addFeature(newFeatureData);
     persistFeatureCreate(createdFeature);
     // Persist the category
-    saveCategory(category);
-    setNewFeature({
-      category: "",
-      description: "",
-      steps: [""],
-      images: [],
-      imagePaths: [],
-      skipTests: defaultSkipTests,
-      model: "opus",
-      thinkingLevel: "none",
-    });
-    // Clear the preview map when the feature is added
-    setNewFeaturePreviewMap(new Map());
-    setShowAddDialog(false);
+    saveCategory(featureData.category);
   };
 
   const handleUpdateFeature = () => {
@@ -1817,7 +1773,6 @@ export function BoardView() {
     </div>
   );
 
-  const newModelAllowsThinking = modelSupportsThinking(newFeature.model);
   const editModelAllowsThinking = modelSupportsThinking(editingFeature?.model);
 
   if (!currentProject) {
@@ -2412,363 +2367,16 @@ export function BoardView() {
       </Dialog>
 
       {/* Add Feature Dialog */}
-      <Dialog
+      <AddFeatureDialog
         open={showAddDialog}
-        onOpenChange={(open) => {
-          setShowAddDialog(open);
-          // Clear preview map, validation error, and reset advanced options when dialog closes
-          if (!open) {
-            setNewFeaturePreviewMap(new Map());
-            setShowAdvancedOptions(false);
-            setDescriptionError(false);
-          }
-        }}
-      >
-        <DialogContent
-          compact={!isMaximized}
-          data-testid="add-feature-dialog"
-          onPointerDownOutside={(e) => {
-            // Prevent dialog from closing when clicking on category autocomplete dropdown
-            const target = e.target as HTMLElement;
-            if (target.closest('[data-testid="category-autocomplete-list"]')) {
-              e.preventDefault();
-            }
-          }}
-          onInteractOutside={(e) => {
-            // Prevent dialog from closing when clicking on category autocomplete dropdown
-            const target = e.target as HTMLElement;
-            if (target.closest('[data-testid="category-autocomplete-list"]')) {
-              e.preventDefault();
-            }
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>Add New Feature</DialogTitle>
-            <DialogDescription>
-              Create a new feature card for the Kanban board.
-            </DialogDescription>
-          </DialogHeader>
-          <Tabs
-            defaultValue="prompt"
-            className="py-4 flex-1 min-h-0 flex flex-col"
-          >
-            <TabsList className="w-full grid grid-cols-3 mb-4">
-              <TabsTrigger value="prompt" data-testid="tab-prompt">
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Prompt
-              </TabsTrigger>
-              <TabsTrigger value="model" data-testid="tab-model">
-                <Settings2 className="w-4 h-4 mr-2" />
-                Model
-              </TabsTrigger>
-              <TabsTrigger value="testing" data-testid="tab-testing">
-                <FlaskConical className="w-4 h-4 mr-2" />
-                Testing
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Prompt Tab */}
-            <TabsContent value="prompt" className="space-y-4 overflow-y-auto">
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <DescriptionImageDropZone
-                  value={newFeature.description}
-                  onChange={(value) => {
-                    setNewFeature({ ...newFeature, description: value });
-                    if (value.trim()) {
-                      setDescriptionError(false);
-                    }
-                  }}
-                  images={newFeature.imagePaths}
-                  onImagesChange={(images) =>
-                    setNewFeature({ ...newFeature, imagePaths: images })
-                  }
-                  placeholder="Describe the feature..."
-                  previewMap={newFeaturePreviewMap}
-                  onPreviewMapChange={setNewFeaturePreviewMap}
-                  autoFocus
-                  error={descriptionError}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="category">Category (optional)</Label>
-                <CategoryAutocomplete
-                  value={newFeature.category}
-                  onChange={(value) =>
-                    setNewFeature({ ...newFeature, category: value })
-                  }
-                  suggestions={categorySuggestions}
-                  placeholder="e.g., Core, UI, API"
-                  data-testid="feature-category-input"
-                />
-              </div>
-            </TabsContent>
-
-            {/* Model Tab */}
-            <TabsContent value="model" className="space-y-4 overflow-y-auto">
-              {/* Show Advanced Options Toggle - only when profiles-only mode is enabled */}
-              {showProfilesOnly && (
-                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">
-                      Simple Mode Active
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Only showing AI profiles. Advanced model tweaking is
-                      hidden.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                    data-testid="show-advanced-options-toggle"
-                  >
-                    <Settings2 className="w-4 h-4 mr-2" />
-                    {showAdvancedOptions ? "Hide" : "Show"} Advanced
-                  </Button>
-                </div>
-              )}
-
-              {/* Quick Select Profile Section */}
-              {aiProfiles.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2">
-                      <UserCircle className="w-4 h-4 text-brand-500" />
-                      Quick Select Profile
-                    </Label>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full border border-brand-500/40 text-brand-500">
-                      Presets
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {aiProfiles.slice(0, 6).map((profile) => {
-                      const IconComponent = profile.icon
-                        ? PROFILE_ICONS[profile.icon]
-                        : Brain;
-                      const isSelected =
-                        newFeature.model === profile.model &&
-                        newFeature.thinkingLevel === profile.thinkingLevel;
-                      return (
-                        <button
-                          key={profile.id}
-                          type="button"
-                          onClick={() => {
-                            setNewFeature({
-                              ...newFeature,
-                              model: profile.model,
-                              thinkingLevel: profile.thinkingLevel,
-                            });
-                          }}
-                          className={cn(
-                            "flex items-center gap-2 p-2 rounded-lg border text-left transition-all",
-                            isSelected
-                              ? "bg-brand-500/10 border-brand-500 text-foreground"
-                              : "bg-background hover:bg-accent border-input"
-                          )}
-                          data-testid={`profile-quick-select-${profile.id}`}
-                        >
-                          <div className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0 bg-primary/10">
-                            {IconComponent && (
-                              <IconComponent className="w-4 h-4 text-primary" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">
-                              {profile.name}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground truncate">
-                              {profile.model}
-                              {profile.thinkingLevel !== "none" &&
-                                ` + ${profile.thinkingLevel}`}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Or customize below. Manage profiles in{" "}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddDialog(false);
-                        useAppStore.getState().setCurrentView("profiles");
-                      }}
-                      className="text-brand-500 hover:underline"
-                    >
-                      AI Profiles
-                    </button>
-                  </p>
-                </div>
-              )}
-
-              {/* Separator */}
-              {aiProfiles.length > 0 &&
-                (!showProfilesOnly || showAdvancedOptions) && (
-                  <div className="border-t border-border" />
-                )}
-
-              {/* Claude Models Section - Hidden when showProfilesOnly is true and showAdvancedOptions is false */}
-              {(!showProfilesOnly || showAdvancedOptions) && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2">
-                      <Brain className="w-4 h-4 text-primary" />
-                      Claude (SDK)
-                    </Label>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full border border-primary/40 text-primary">
-                      Native
-                    </span>
-                  </div>
-                  {renderModelOptions(
-                    CLAUDE_MODELS,
-                    newFeature.model,
-                    (model) =>
-                      setNewFeature({
-                        ...newFeature,
-                        model,
-                        thinkingLevel: modelSupportsThinking(model)
-                          ? newFeature.thinkingLevel
-                          : "none",
-                      })
-                  )}
-
-                  {/* Thinking Level - Only shown when Claude model is selected */}
-                  {newModelAllowsThinking && (
-                    <div className="space-y-2 pt-2 border-t border-border">
-                      <Label className="flex items-center gap-2 text-sm">
-                        <Brain className="w-3.5 h-3.5 text-muted-foreground" />
-                        Thinking Level
-                      </Label>
-                      <div className="flex gap-2 flex-wrap">
-                        {(
-                          [
-                            "none",
-                            "low",
-                            "medium",
-                            "high",
-                            "ultrathink",
-                          ] as ThinkingLevel[]
-                        ).map((level) => (
-                          <button
-                            key={level}
-                            type="button"
-                            onClick={() => {
-                              setNewFeature({
-                                ...newFeature,
-                                thinkingLevel: level,
-                              });
-                            }}
-                            className={cn(
-                              "flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors min-w-[60px]",
-                              newFeature.thinkingLevel === level
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-background hover:bg-accent border-input"
-                            )}
-                            data-testid={`thinking-level-${level}`}
-                          >
-                            {level === "none" && "None"}
-                            {level === "low" && "Low"}
-                            {level === "medium" && "Med"}
-                            {level === "high" && "High"}
-                            {level === "ultrathink" && "Ultra"}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Higher levels give more time to reason through complex
-                        problems.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </TabsContent>
-
-            {/* Testing Tab */}
-            <TabsContent value="testing" className="space-y-4 overflow-y-auto">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="skip-tests"
-                  checked={!newFeature.skipTests}
-                  onCheckedChange={(checked) =>
-                    setNewFeature({
-                      ...newFeature,
-                      skipTests: checked !== true,
-                    })
-                  }
-                  data-testid="skip-tests-checkbox"
-                />
-                <div className="flex items-center gap-2">
-                  <Label
-                    htmlFor="skip-tests"
-                    className="text-sm cursor-pointer"
-                  >
-                    Enable automated testing
-                  </Label>
-                  <FlaskConical className="w-3.5 h-3.5 text-muted-foreground" />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                When enabled, this feature will use automated TDD. When
-                disabled, it will require manual verification.
-              </p>
-
-              {/* Verification Steps - Only shown when skipTests is enabled */}
-              {newFeature.skipTests && (
-                <div className="space-y-2 pt-2 border-t border-border">
-                  <Label>Verification Steps</Label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Add manual steps to verify this feature works correctly.
-                  </p>
-                  {newFeature.steps.map((step, index) => (
-                    <Input
-                      key={index}
-                      placeholder={`Verification step ${index + 1}`}
-                      value={step}
-                      onChange={(e) => {
-                        const steps = [...newFeature.steps];
-                        steps[index] = e.target.value;
-                        setNewFeature({ ...newFeature, steps });
-                      }}
-                      data-testid={`feature-step-${index}-input`}
-                    />
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setNewFeature({
-                        ...newFeature,
-                        steps: [...newFeature.steps, ""],
-                      })
-                    }
-                    data-testid="add-step-button"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Verification Step
-                  </Button>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowAddDialog(false)}>
-              Cancel
-            </Button>
-            <HotkeyButton
-              onClick={handleAddFeature}
-              hotkey={{ key: "Enter", cmdCtrl: true }}
-              hotkeyActive={showAddDialog}
-              data-testid="confirm-add-feature"
-            >
-              Add Feature
-            </HotkeyButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={setShowAddDialog}
+        onAdd={handleAddFeature}
+        categorySuggestions={categorySuggestions}
+        defaultSkipTests={defaultSkipTests}
+        isMaximized={isMaximized}
+        showProfilesOnly={showProfilesOnly}
+        aiProfiles={aiProfiles}
+      />
 
       {/* Edit Feature Dialog */}
       <Dialog
