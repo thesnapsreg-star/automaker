@@ -4,31 +4,12 @@ import { waitForElement } from "../core/waiting";
 
 /**
  * Navigate to the board/kanban view
+ * Note: Navigates directly to /board since index route shows WelcomeView
  */
 export async function navigateToBoard(page: Page): Promise<void> {
-  await page.goto("/");
-
-  // Wait for the page to load
+  // Navigate directly to /board route
+  await page.goto("/board");
   await page.waitForLoadState("networkidle");
-
-  // Check if we're on the board view already
-  const boardView = page.locator('[data-testid="board-view"]');
-  const isOnBoard = await boardView.isVisible().catch(() => false);
-
-  if (!isOnBoard) {
-    // Try to click on a recent project first (from welcome screen)
-    const recentProject = page.locator('p:has-text("Test Project")').first();
-    if (await recentProject.isVisible().catch(() => false)) {
-      await recentProject.click();
-      await page.waitForTimeout(200);
-    }
-
-    // Then click on Kanban Board nav button to ensure we're on the board
-    const kanbanNav = page.locator('[data-testid="nav-board"]');
-    if (await kanbanNav.isVisible().catch(() => false)) {
-      await kanbanNav.click();
-    }
-  }
 
   // Wait for the board view to be visible
   await waitForElement(page, "board-view", { timeout: 10000 });
@@ -36,18 +17,12 @@ export async function navigateToBoard(page: Page): Promise<void> {
 
 /**
  * Navigate to the context view
+ * Note: Navigates directly to /context since index route shows WelcomeView
  */
 export async function navigateToContext(page: Page): Promise<void> {
-  await page.goto("/");
-
-  // Wait for the page to load
+  // Navigate directly to /context route
+  await page.goto("/context");
   await page.waitForLoadState("networkidle");
-
-  // Click on the Context nav button
-  const contextNav = page.locator('[data-testid="nav-context"]');
-  if (await contextNav.isVisible().catch(() => false)) {
-    await contextNav.click();
-  }
 
   // Wait for the context view to be visible
   await waitForElement(page, "context-view", { timeout: 10000 });
@@ -55,18 +30,12 @@ export async function navigateToContext(page: Page): Promise<void> {
 
 /**
  * Navigate to the spec view
+ * Note: Navigates directly to /spec since index route shows WelcomeView
  */
 export async function navigateToSpec(page: Page): Promise<void> {
-  await page.goto("/");
-
-  // Wait for the page to load
+  // Navigate directly to /spec route
+  await page.goto("/spec");
   await page.waitForLoadState("networkidle");
-
-  // Click on the Spec nav button
-  const specNav = page.locator('[data-testid="nav-spec"]');
-  if (await specNav.isVisible().catch(() => false)) {
-    await specNav.click();
-  }
 
   // Wait for the spec view to be visible
   await waitForElement(page, "spec-view", { timeout: 10000 });
@@ -74,18 +43,12 @@ export async function navigateToSpec(page: Page): Promise<void> {
 
 /**
  * Navigate to the agent view
+ * Note: Navigates directly to /agent since index route shows WelcomeView
  */
 export async function navigateToAgent(page: Page): Promise<void> {
-  await page.goto("/");
-
-  // Wait for the page to load
+  // Navigate directly to /agent route
+  await page.goto("/agent");
   await page.waitForLoadState("networkidle");
-
-  // Click on the Agent nav button
-  const agentNav = page.locator('[data-testid="nav-agent"]');
-  if (await agentNav.isVisible().catch(() => false)) {
-    await agentNav.click();
-  }
 
   // Wait for the agent view to be visible
   await waitForElement(page, "agent-view", { timeout: 10000 });
@@ -93,18 +56,12 @@ export async function navigateToAgent(page: Page): Promise<void> {
 
 /**
  * Navigate to the settings view
+ * Note: Navigates directly to /settings since index route shows WelcomeView
  */
 export async function navigateToSettings(page: Page): Promise<void> {
-  await page.goto("/");
-
-  // Wait for the page to load
+  // Navigate directly to /settings route
+  await page.goto("/settings");
   await page.waitForLoadState("networkidle");
-
-  // Click on the Settings button in the sidebar
-  const settingsButton = page.locator('[data-testid="settings-button"]');
-  if (await settingsButton.isVisible().catch(() => false)) {
-    await settingsButton.click();
-  }
 
   // Wait for the settings view to be visible
   await waitForElement(page, "settings-view", { timeout: 10000 });

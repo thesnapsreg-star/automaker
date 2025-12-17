@@ -458,8 +458,15 @@ export async function setupProjectWithStaleWorktree(page: Page, projectPath: str
 
 /**
  * Wait for the board view to load
+ * Navigates to /board first since the index route shows WelcomeView
  */
 export async function waitForBoardView(page: Page): Promise<void> {
+  // Navigate directly to /board route (index route shows welcome view)
+  const currentUrl = page.url();
+  if (!currentUrl.includes('/board')) {
+    await page.goto('/board');
+    await page.waitForLoadState('networkidle');
+  }
   await page.waitForSelector('[data-testid="board-view"]', { timeout: TIMEOUTS.long });
 }
 
