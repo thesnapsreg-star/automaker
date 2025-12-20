@@ -11,12 +11,12 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: ["src/**/*.d.ts", "src/index.ts"],
       thresholds: {
-        // Current overall coverage: ~19% (only error-handler.ts tested)
-        // Set modest thresholds until more files are tested
-        lines: 15,
-        functions: 15,
-        branches: 25,
-        statements: 15,
+        // Excellent coverage: 94.3% stmts, 89.77% branches, 100% funcs, 94.21% lines
+        // All files now have comprehensive tests
+        lines: 90,
+        functions: 95,
+        branches: 85,
+        statements: 90,
       },
     },
   },
