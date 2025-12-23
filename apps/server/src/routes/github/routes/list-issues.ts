@@ -2,6 +2,7 @@
  * POST /list-issues endpoint - List GitHub issues for a project
  */
 
+import { spawn } from 'child_process';
 import type { Request, Response } from 'express';
 import { execAsync, execEnv, getErrorMessage, logError } from './common.js';
 import { checkGitHubRemote } from './check-github-remote.js';
@@ -109,17 +110,48 @@ async function fetchLinkedPRs(
     }`;
 
     try {
-      const { stdout } = await execAsync(`gh api graphql -f query='${query}'`, {
-        cwd: projectPath,
-        env: execEnv,
+      // Use spawn with stdin to avoid shell injection vulnerabilities
+      const response = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        const gh = spawn('gh', ['api', 'graphql', '-f', 'query=-'], {
+          cwd: projectPath,
+          env: execEnv,
+        });
+
+        let stdout = '';
+        let stderr = '';
+        gh.stdout.on('data', (data: Buffer) => (stdout += data.toString()));
+        gh.stderr.on('data', (data: Buffer) => (stderr += data.toString()));
+
+        gh.on('close', (code) => {
+          if (code !== 0) {
+            return reject(new Error(`gh process exited with code ${code}: ${stderr}`));
+          }
+          try {
+            resolve(JSON.parse(stdout));
+          } catch (e) {
+            reject(e);
+          }
+        });
+
+        gh.stdin.write(query);
+        gh.stdin.end();
       });
 
-      const response = JSON.parse(stdout);
-      const repoData = response?.data?.repository;
+      const repoData = (response?.data as Record<string, unknown>)?.repository as Record<
+        string,
+        unknown
+      > | null;
 
       if (repoData) {
         batch.forEach((issueNum, idx) => {
-          const issueData = repoData[`issue${idx}`];
+          const issueData = repoData[`issue${idx}`] as {
+            timelineItems?: {
+              nodes?: Array<{
+                source?: { number?: number; title?: string; state?: string; url?: string };
+                subject?: { number?: number; title?: string; state?: string; url?: string };
+              }>;
+            };
+          } | null;
           if (issueData?.timelineItems?.nodes) {
             const linkedPRs: LinkedPullRequest[] = [];
             const seenPRs = new Set<number>();
@@ -130,9 +162,9 @@ async function fetchLinkedPRs(
                 seenPRs.add(pr.number);
                 linkedPRs.push({
                   number: pr.number,
-                  title: pr.title,
-                  state: pr.state.toLowerCase(),
-                  url: pr.url,
+                  title: pr.title || '',
+                  state: (pr.state || '').toLowerCase(),
+                  url: pr.url || '',
                 });
               }
             }
@@ -143,9 +175,12 @@ async function fetchLinkedPRs(
           }
         });
       }
-    } catch {
+    } catch (error) {
       // If GraphQL fails, continue without linked PRs
-      console.warn('Failed to fetch linked PRs via GraphQL');
+      console.warn(
+        'Failed to fetch linked PRs via GraphQL:',
+        error instanceof Error ? error.message : error
+      );
     }
   }
 

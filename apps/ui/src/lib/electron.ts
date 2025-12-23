@@ -2730,6 +2730,7 @@ function createMockGitHubAPI(): GitHubAPI {
             cb({
               type: 'issue_validation_complete',
               issueNumber: issue.issueNumber,
+              issueTitle: issue.issueTitle,
               result: {
                 verdict: 'valid' as const,
                 confidence: 'medium' as const,
@@ -2739,6 +2740,7 @@ function createMockGitHubAPI(): GitHubAPI {
                 estimatedComplexity: 'moderate' as const,
               },
               projectPath,
+              model: model || 'sonnet',
             })
           );
         }, 2000);
@@ -2770,6 +2772,12 @@ function createMockGitHubAPI(): GitHubAPI {
       return {
         success: true,
         validations: [],
+      };
+    },
+    markValidationViewed: async (projectPath: string, issueNumber: number) => {
+      console.log('[Mock] Marking validation as viewed:', { projectPath, issueNumber });
+      return {
+        success: true,
       };
     },
     onValidationEvent: (callback: (event: IssueValidationEvent) => void) => {

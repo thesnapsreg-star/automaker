@@ -67,31 +67,33 @@ export async function readValidation(
  * @returns Array of stored validations
  */
 export async function getAllValidations(projectPath: string): Promise<StoredValidation[]> {
-  const validations: StoredValidation[] = [];
   const validationsDir = getValidationsDir(projectPath);
 
   try {
     const dirs = await secureFs.readdir(validationsDir, { withFileTypes: true });
 
-    for (const dir of dirs) {
-      if (dir.isDirectory()) {
+    // Read all validation files in parallel for better performance
+    const promises = dirs
+      .filter((dir) => dir.isDirectory())
+      .map((dir) => {
         const issueNumber = parseInt(dir.name, 10);
         if (!isNaN(issueNumber)) {
-          const validation = await readValidation(projectPath, issueNumber);
-          if (validation) {
-            validations.push(validation);
-          }
+          return readValidation(projectPath, issueNumber);
         }
-      }
-    }
+        return Promise.resolve(null);
+      });
+
+    const results = await Promise.all(promises);
+    const validations = results.filter((v): v is StoredValidation => v !== null);
+
+    // Sort by issue number
+    validations.sort((a, b) => a.issueNumber - b.issueNumber);
+
+    return validations;
   } catch {
     // Directory doesn't exist
+    return [];
   }
-
-  // Sort by issue number
-  validations.sort((a, b) => a.issueNumber - b.issueNumber);
-
-  return validations;
 }
 
 /**

@@ -162,14 +162,14 @@ export function GitHubIssuesView() {
             return next;
           });
 
-          // Update cached validations (use event.issueTitle to avoid stale closure)
+          // Update cached validations (use event.model to avoid stale closure race condition)
           setCachedValidations((prev) => {
             const next = new Map(prev);
             next.set(event.issueNumber, {
               issueNumber: event.issueNumber,
               issueTitle: event.issueTitle,
               validatedAt: new Date().toISOString(),
-              model: validationModel,
+              model: event.model,
               result: event.result,
             });
             return next;

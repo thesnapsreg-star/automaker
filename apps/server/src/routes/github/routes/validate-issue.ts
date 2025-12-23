@@ -159,6 +159,7 @@ async function runValidation(
       issueTitle,
       result: validationResult,
       projectPath,
+      model,
     };
     events.emit('issue-validation:event', completeEvent);
   } catch (error) {

@@ -101,6 +101,8 @@ export type IssueValidationEvent =
       issueTitle: string;
       result: IssueValidationResult;
       projectPath: string;
+      /** Model used for validation (opus, sonnet, haiku) */
+      model: AgentModel;
     }
   | {
       type: 'issue_validation_error';
