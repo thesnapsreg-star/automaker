@@ -372,21 +372,9 @@ export function BacklogPlanDialog({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wand2 className="w-5 h-5 text-primary" />
-              {mode === 'review' ? 'Review Plan' : 'Plan Backlog Changes'}
-            </div>
-            {mode === 'input' && (
-              <ModelOverrideTrigger
-                currentModel={effectiveModel}
-                onModelChange={setModelOverride}
-                phase="backlogPlanningModel"
-                size="sm"
-                variant="icon"
-                isOverridden={modelOverride !== null}
-              />
-            )}
+          <DialogTitle className="flex items-center gap-2">
+            <Wand2 className="w-5 h-5 text-primary" />
+            {mode === 'review' ? 'Review Plan' : 'Plan Backlog Changes'}
           </DialogTitle>
           <DialogDescription>
             {mode === 'review'
@@ -400,6 +388,17 @@ export function BacklogPlanDialog({
         <DialogFooter>
           {mode === 'input' && (
             <>
+              <div className="flex items-center gap-2 mr-auto">
+                <span className="text-xs text-muted-foreground">Model:</span>
+                <ModelOverrideTrigger
+                  currentModel={effectiveModel}
+                  onModelChange={setModelOverride}
+                  phase="backlogPlanningModel"
+                  size="sm"
+                  variant="button"
+                  isOverridden={modelOverride !== null}
+                />
+              </div>
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>
