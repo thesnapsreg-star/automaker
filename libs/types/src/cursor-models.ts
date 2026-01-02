@@ -166,3 +166,170 @@ export function getCursorModelLabel(modelId: CursorModelId): string {
 export function getAllCursorModelIds(): CursorModelId[] {
   return Object.keys(CURSOR_MODEL_MAP) as CursorModelId[];
 }
+
+// ============================================================================
+// Model Grouping System
+// Groups related model variants (e.g., gpt-5.2 + gpt-5.2-high) for UI display
+// ============================================================================
+
+/**
+ * Type of variant options available for grouped models
+ */
+export type VariantType = 'compute' | 'thinking' | 'capacity';
+
+/**
+ * A single variant option within a grouped model
+ */
+export interface ModelVariant {
+  id: CursorModelId;
+  label: string;
+  description?: string;
+  badge?: string;
+}
+
+/**
+ * A grouped model that contains multiple variant options
+ */
+export interface GroupedModel {
+  baseId: string;
+  label: string;
+  description: string;
+  variantType: VariantType;
+  variants: ModelVariant[];
+}
+
+/**
+ * Configuration for grouping Cursor models with variants
+ */
+export const CURSOR_MODEL_GROUPS: GroupedModel[] = [
+  // GPT-5.2 group (compute levels)
+  {
+    baseId: 'gpt-5.2-group',
+    label: 'GPT-5.2',
+    description: 'OpenAI GPT-5.2 via Cursor',
+    variantType: 'compute',
+    variants: [
+      { id: 'gpt-5.2', label: 'Standard', description: 'Default compute level' },
+      {
+        id: 'gpt-5.2-high',
+        label: 'High',
+        description: 'High compute level',
+        badge: 'More tokens',
+      },
+    ],
+  },
+  // GPT-5.1 group (compute levels)
+  {
+    baseId: 'gpt-5.1-group',
+    label: 'GPT-5.1',
+    description: 'OpenAI GPT-5.1 via Cursor',
+    variantType: 'compute',
+    variants: [
+      { id: 'gpt-5.1', label: 'Standard', description: 'Default compute level' },
+      {
+        id: 'gpt-5.1-high',
+        label: 'High',
+        description: 'High compute level',
+        badge: 'More tokens',
+      },
+    ],
+  },
+  // GPT-5.1 Codex group (capacity + compute matrix)
+  {
+    baseId: 'gpt-5.1-codex-group',
+    label: 'GPT-5.1 Codex',
+    description: 'OpenAI GPT-5.1 Codex for code generation',
+    variantType: 'capacity',
+    variants: [
+      { id: 'gpt-5.1-codex', label: 'Standard', description: 'Default capacity' },
+      { id: 'gpt-5.1-codex-high', label: 'High', description: 'High compute', badge: 'Compute' },
+      { id: 'gpt-5.1-codex-max', label: 'Max', description: 'Maximum capacity', badge: 'Capacity' },
+      {
+        id: 'gpt-5.1-codex-max-high',
+        label: 'Max High',
+        description: 'Max capacity + high compute',
+        badge: 'Premium',
+      },
+    ],
+  },
+  // Sonnet 4.5 group (thinking mode)
+  {
+    baseId: 'sonnet-4.5-group',
+    label: 'Claude Sonnet 4.5',
+    description: 'Anthropic Claude Sonnet 4.5 via Cursor',
+    variantType: 'thinking',
+    variants: [
+      { id: 'sonnet-4.5', label: 'Standard', description: 'Fast responses' },
+      {
+        id: 'sonnet-4.5-thinking',
+        label: 'Thinking',
+        description: 'Extended reasoning',
+        badge: 'Reasoning',
+      },
+    ],
+  },
+  // Opus 4.5 group (thinking mode)
+  {
+    baseId: 'opus-4.5-group',
+    label: 'Claude Opus 4.5',
+    description: 'Anthropic Claude Opus 4.5 via Cursor',
+    variantType: 'thinking',
+    variants: [
+      { id: 'opus-4.5', label: 'Standard', description: 'Fast responses' },
+      {
+        id: 'opus-4.5-thinking',
+        label: 'Thinking',
+        description: 'Extended reasoning',
+        badge: 'Reasoning',
+      },
+    ],
+  },
+];
+
+/**
+ * Cursor models that are not part of any group (standalone)
+ */
+export const STANDALONE_CURSOR_MODELS: CursorModelId[] = [
+  'auto',
+  'composer-1',
+  'opus-4.1',
+  'gemini-3-pro',
+  'gemini-3-flash',
+  'grok',
+];
+
+/**
+ * Get the group that a model belongs to (if any)
+ */
+export function getModelGroup(modelId: CursorModelId): GroupedModel | undefined {
+  return CURSOR_MODEL_GROUPS.find((group) => group.variants.some((v) => v.id === modelId));
+}
+
+/**
+ * Check if any variant in a group is the currently selected model
+ */
+export function isGroupSelected(
+  group: GroupedModel,
+  currentModelId: CursorModelId | undefined
+): boolean {
+  if (!currentModelId) return false;
+  return group.variants.some((v) => v.id === currentModelId);
+}
+
+/**
+ * Get the currently selected variant within a group
+ */
+export function getSelectedVariant(
+  group: GroupedModel,
+  currentModelId: CursorModelId | undefined
+): ModelVariant | undefined {
+  if (!currentModelId) return undefined;
+  return group.variants.find((v) => v.id === currentModelId);
+}
+
+/**
+ * Check if a model ID belongs to a group
+ */
+export function isGroupedCursorModel(modelId: CursorModelId): boolean {
+  return CURSOR_MODEL_GROUPS.some((group) => group.variants.some((v) => v.id === modelId));
+}
