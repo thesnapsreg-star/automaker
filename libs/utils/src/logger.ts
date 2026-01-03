@@ -3,7 +3,7 @@
  *
  * Environment Variables:
  * - LOG_LEVEL: error, warn, info, debug (default: info)
- * - LOG_COLORS: true/false (default: auto-detect TTY)
+ * - LOG_COLORS: true/false (default: true in Node.js)
  * - LOG_TIMESTAMPS: true/false (default: false)
  */
 
@@ -59,16 +59,6 @@ const isBrowser = typeof (globalThis as any).window !== 'undefined';
 // Configuration state
 let currentLogLevel: LogLevel = LogLevel.INFO;
 
-// Detect if we're in a Node.js environment with TTY support
-function isTTY(): boolean {
-  if (isBrowser) return false;
-  try {
-    return process?.stdout?.isTTY ?? false;
-  } catch {
-    return false;
-  }
-}
-
 // Get environment variable safely (works in both Node.js and browser)
 function getEnvVar(name: string): string | undefined {
   if (isBrowser) return undefined;
@@ -80,7 +70,8 @@ function getEnvVar(name: string): string | undefined {
 }
 
 // Initialize configuration from environment variables
-let colorsEnabled = isTTY() && getEnvVar('LOG_COLORS') !== 'false';
+// Colors enabled by default in Node.js, can be disabled with LOG_COLORS=false
+let colorsEnabled = !isBrowser && getEnvVar('LOG_COLORS') !== 'false';
 let timestampsEnabled = getEnvVar('LOG_TIMESTAMPS') === 'true';
 
 // Initialize log level from environment variable
@@ -209,7 +200,7 @@ export function createLogger(context: string): Logger {
 
     warn: (...args: unknown[]): void => {
       if (currentLogLevel >= LogLevel.WARN) {
-        console.warn(formatNodeLog('WARN', context, ANSI.yellow), ...args);
+        console.log(formatNodeLog('WARN', context, ANSI.yellow), ...args);
       }
     },
 
