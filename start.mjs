@@ -18,6 +18,7 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { createRequire } from 'module';
 import {
   createRestrictedFs,
   log,
@@ -36,6 +37,9 @@ import {
   sleep,
 } from './scripts/launcher-utils.mjs';
 
+const require = createRequire(import.meta.url);
+const crossSpawn = require('cross-spawn');
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -47,26 +51,11 @@ const processes = {
   server: null,
   web: null,
   electron: null,
+  docker: null,
 };
 
 /**
- * Check if production builds exist
- * @returns {{server: boolean, ui: boolean, electron: boolean}}
- */
-function checkBuilds() {
-  const serverDist = path.join(__dirname, 'apps', 'server', 'dist');
-  const uiDist = path.join(__dirname, 'apps', 'ui', 'dist');
-  const electronDist = path.join(__dirname, 'apps', 'ui', 'dist-electron', 'main.js');
-
-  return {
-    server: fs.existsSync(serverDist),
-    ui: fs.existsSync(uiDist),
-    electron: fs.existsSync(electronDist),
-  };
-}
-
-/**
- * Build all production artifacts if needed
+ * Build all production artifacts
  */
 async function ensureProductionBuilds() {
   // Always build shared packages first to ensure they're up to date
@@ -93,25 +82,15 @@ async function ensureProductionBuilds() {
     process.exit(1);
   }
 
-  // Check if UI/Electron builds exist (these are slower, so only build if missing)
-  const builds = checkBuilds();
-
-  if (!builds.ui || !builds.electron) {
-    log('UI/Electron builds not found. Building...', 'yellow');
+  // Always rebuild UI to ensure it's in sync with latest code
+  log('Building UI...', 'blue');
+  try {
+    await runNpmAndWait(['run', 'build'], { stdio: 'inherit' }, __dirname);
+    log('✓ UI built', 'green');
     console.log('');
-
-    try {
-      log('Building UI...', 'blue');
-      await runNpmAndWait(['run', 'build'], { stdio: 'inherit' }, __dirname);
-      log('✓ Build complete!', 'green');
-      console.log('');
-    } catch (error) {
-      log(`Build failed: ${error.message}`, 'red');
-      process.exit(1);
-    }
-  } else {
-    log('✓ UI builds found', 'green');
-    console.log('');
+  } catch (error) {
+    log(`Failed to build UI: ${error.message}`, 'red');
+    process.exit(1);
   }
 }
 
@@ -142,7 +121,7 @@ async function main() {
 
   // Prompt for choice
   while (true) {
-    const choice = await prompt('Enter your choice (1 or 2): ');
+    const choice = await prompt('Enter your choice (1, 2, or 3): ');
 
     if (choice === '1') {
       console.log('');
@@ -249,8 +228,42 @@ async function main() {
       });
 
       break;
+    } else if (choice === '3') {
+      console.log('');
+      log('Launching Docker Container (Isolated Mode)...', 'blue');
+      log('Building and starting Docker containers...', 'yellow');
+      console.log('');
+
+      // Check if ANTHROPIC_API_KEY is set
+      if (!process.env.ANTHROPIC_API_KEY) {
+        log('Warning: ANTHROPIC_API_KEY environment variable is not set.', 'yellow');
+        log('The server will require an API key to function.', 'yellow');
+        log('Set it with: export ANTHROPIC_API_KEY=your-key', 'yellow');
+        console.log('');
+      }
+
+      // Build and start containers with docker-compose
+      processes.docker = crossSpawn('docker', ['compose', 'up', '--build'], {
+        stdio: 'inherit',
+        cwd: __dirname,
+        env: {
+          ...process.env,
+        },
+      });
+
+      log('Docker containers starting...', 'blue');
+      log('UI will be available at: http://localhost:3007', 'green');
+      log('API will be available at: http://localhost:3008', 'green');
+      console.log('');
+      log('Press Ctrl+C to stop the containers.', 'yellow');
+
+      await new Promise((resolve) => {
+        processes.docker.on('close', resolve);
+      });
+
+      break;
     } else {
-      log('Invalid choice. Please enter 1 or 2.', 'red');
+      log('Invalid choice. Please enter 1, 2, or 3.', 'red');
     }
   }
 }

@@ -42,6 +42,7 @@ const processes = {
   server: null,
   web: null,
   electron: null,
+  docker: null,
 };
 
 /**
@@ -96,7 +97,7 @@ async function main() {
 
   // Prompt for choice
   while (true) {
-    const choice = await prompt('Enter your choice (1 or 2): ');
+    const choice = await prompt('Enter your choice (1, 2, or 3): ');
 
     if (choice === '1') {
       console.log('');
@@ -168,8 +169,42 @@ async function main() {
       });
 
       break;
+    } else if (choice === '3') {
+      console.log('');
+      log('Launching Docker Container (Isolated Mode)...', 'blue');
+      log('Building and starting Docker containers...', 'yellow');
+      console.log('');
+
+      // Check if ANTHROPIC_API_KEY is set
+      if (!process.env.ANTHROPIC_API_KEY) {
+        log('Warning: ANTHROPIC_API_KEY environment variable is not set.', 'yellow');
+        log('The server will require an API key to function.', 'yellow');
+        log('Set it with: export ANTHROPIC_API_KEY=your-key', 'yellow');
+        console.log('');
+      }
+
+      // Build and start containers with docker-compose
+      processes.docker = crossSpawn('docker', ['compose', 'up', '--build'], {
+        stdio: 'inherit',
+        cwd: __dirname,
+        env: {
+          ...process.env,
+        },
+      });
+
+      log('Docker containers starting...', 'blue');
+      log('UI will be available at: http://localhost:3007', 'green');
+      log('API will be available at: http://localhost:3008', 'green');
+      console.log('');
+      log('Press Ctrl+C to stop the containers.', 'yellow');
+
+      await new Promise((resolve) => {
+        processes.docker.on('close', resolve);
+      });
+
+      break;
     } else {
-      log('Invalid choice. Please enter 1 or 2.', 'red');
+      log('Invalid choice. Please enter 1, 2, or 3.', 'red');
     }
   }
 }

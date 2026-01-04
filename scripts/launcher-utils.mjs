@@ -496,6 +496,7 @@ export function printModeMenu() {
   console.log('═══════════════════════════════════════════════════════');
   console.log('  1) Web Application (Browser)');
   console.log('  2) Desktop Application (Electron)');
+  console.log('  3) Docker Container (Isolated)');
   console.log('═══════════════════════════════════════════════════════');
   console.log('');
 }
@@ -506,7 +507,7 @@ export function printModeMenu() {
 
 /**
  * Create a cleanup handler for spawned processes
- * @param {object} processes - Object with process references {server, web, electron}
+ * @param {object} processes - Object with process references {server, web, electron, docker}
  * @returns {Function} - Cleanup function
  */
 export function createCleanupHandler(processes) {
@@ -525,6 +526,10 @@ export function createCleanupHandler(processes) {
 
     if (processes.electron && !processes.electron.killed && processes.electron.pid) {
       killPromises.push(killProcessTree(processes.electron.pid));
+    }
+
+    if (processes.docker && !processes.docker.killed && processes.docker.pid) {
+      killPromises.push(killProcessTree(processes.docker.pid));
     }
 
     await Promise.all(killPromises);
