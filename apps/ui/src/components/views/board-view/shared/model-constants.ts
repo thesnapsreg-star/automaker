@@ -2,6 +2,7 @@ import type { ModelAlias } from '@/store/app-store';
 import type { ModelProvider, ThinkingLevel, ReasoningEffort } from '@automaker/types';
 import { CURSOR_MODEL_MAP, CODEX_MODEL_MAP } from '@automaker/types';
 import { Brain, Zap, Scale, Cpu, Rocket, Sparkles } from 'lucide-react';
+import { AnthropicIcon, CursorIcon, OpenAIIcon } from '@/components/ui/provider-icon';
 
 export type ModelOption = {
   id: string; // Claude models use ModelAlias, Cursor models use "cursor-{id}"
@@ -58,47 +59,39 @@ export const CODEX_MODELS: ModelOption[] = [
   {
     id: CODEX_MODEL_MAP.gpt52Codex,
     label: 'GPT-5.2-Codex',
-    description: 'Most advanced agentic coding model (default for ChatGPT users).',
+    description: 'Most advanced agentic coding model for complex software engineering.',
     badge: 'Premium',
     provider: 'codex',
     hasThinking: true,
   },
   {
-    id: CODEX_MODEL_MAP.gpt5Codex,
-    label: 'GPT-5-Codex',
-    description: 'Purpose-built for Codex CLI (default for CLI users).',
-    badge: 'Balanced',
+    id: CODEX_MODEL_MAP.gpt51CodexMax,
+    label: 'GPT-5.1-Codex-Max',
+    description: 'Optimized for long-horizon, agentic coding tasks in Codex.',
+    badge: 'Premium',
     provider: 'codex',
     hasThinking: true,
   },
   {
-    id: CODEX_MODEL_MAP.gpt5CodexMini,
-    label: 'GPT-5-Codex-Mini',
-    description: 'Faster workflows for code Q&A and editing.',
+    id: CODEX_MODEL_MAP.gpt51CodexMini,
+    label: 'GPT-5.1-Codex-Mini',
+    description: 'Smaller, more cost-effective version for faster workflows.',
     badge: 'Speed',
     provider: 'codex',
     hasThinking: false,
   },
   {
-    id: CODEX_MODEL_MAP.codex1,
-    label: 'Codex-1',
-    description: 'o3-based model optimized for software engineering.',
-    badge: 'Premium',
+    id: CODEX_MODEL_MAP.gpt52,
+    label: 'GPT-5.2',
+    description: 'Best general agentic model for tasks across industries and domains.',
+    badge: 'Balanced',
     provider: 'codex',
     hasThinking: true,
   },
   {
-    id: CODEX_MODEL_MAP.codexMiniLatest,
-    label: 'Codex-Mini-Latest',
-    description: 'o4-mini-based model for faster workflows.',
-    badge: 'Balanced',
-    provider: 'codex',
-    hasThinking: false,
-  },
-  {
-    id: CODEX_MODEL_MAP.gpt5,
-    label: 'GPT-5',
-    description: 'GPT-5 base flagship model.',
+    id: CODEX_MODEL_MAP.gpt51,
+    label: 'GPT-5.1',
+    description: 'Great for coding and agentic tasks across domains.',
     badge: 'Balanced',
     provider: 'codex',
     hasThinking: true,
@@ -150,4 +143,7 @@ export const PROFILE_ICONS: Record<string, React.ComponentType<{ className?: str
   Cpu,
   Rocket,
   Sparkles,
+  Anthropic: AnthropicIcon,
+  Cursor: CursorIcon,
+  Codex: OpenAIIcon,
 };

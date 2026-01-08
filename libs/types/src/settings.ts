@@ -13,6 +13,7 @@ import type { OpencodeModelId } from './opencode-models.js';
 import { getAllOpencodeModelIds, DEFAULT_OPENCODE_MODEL } from './opencode-models.js';
 import type { PromptCustomization } from './prompts.js';
 import type { CodexSandboxMode, CodexApprovalPolicy } from './codex.js';
+import type { ReasoningEffort } from './provider.js';
 
 // Re-export ModelAlias for convenience
 export type { ModelAlias };
@@ -110,14 +111,18 @@ const DEFAULT_CODEX_ADDITIONAL_DIRS: string[] = [];
 /**
  * PhaseModelEntry - Configuration for a single phase model
  *
- * Encapsulates both the model selection and optional thinking level
- * for Claude models. Cursor models handle thinking internally.
+ * Encapsulates the model selection and optional reasoning/thinking capabilities:
+ * - Claude models: Use thinkingLevel for extended thinking
+ * - Codex models: Use reasoningEffort for reasoning intensity
+ * - Cursor models: Handle thinking internally
  */
 export interface PhaseModelEntry {
-  /** The model to use (Claude alias or Cursor model ID) */
-  model: ModelAlias | CursorModelId;
+  /** The model to use (Claude alias, Cursor model ID, or Codex model ID) */
+  model: ModelAlias | CursorModelId | CodexModelId;
   /** Extended thinking level (only applies to Claude models, defaults to 'none') */
   thinkingLevel?: ThinkingLevel;
+  /** Reasoning effort level (only applies to Codex models, defaults to 'none') */
+  reasoningEffort?: ReasoningEffort;
 }
 
 /**
@@ -282,7 +287,7 @@ export function profileHasThinking(profile: AIProfile): boolean {
 
   if (profile.provider === 'codex') {
     // Codex models handle thinking internally (o-series models)
-    const model = profile.codexModel || 'gpt-5.2';
+    const model = profile.codexModel || 'codex-gpt-5.2';
     return model.startsWith('o');
   }
 
@@ -303,7 +308,7 @@ export function getProfileModelString(profile: AIProfile): string {
   }
 
   if (profile.provider === 'codex') {
-    return `codex:${profile.codexModel || 'gpt-5.2'}`;
+    return `codex:${profile.codexModel || 'codex-gpt-5.2'}`;
   }
 
   if (profile.provider === 'opencode') {

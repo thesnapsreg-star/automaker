@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { ModelAlias, ModelProvider } from '@/store/app-store';
+import { CODEX_MODEL_CONFIG_MAP, codexModelHasThinking } from '@automaker/types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -8,8 +9,31 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Determine if the current model supports extended thinking controls
+ * Note: This is for Claude's "thinking levels" only, not Codex's "reasoning effort"
+ *
+ * Rules:
+ * - Claude models: support thinking (sonnet-4.5-thinking, opus-4.5-thinking, etc.)
+ * - Cursor models: NO thinking controls (handled internally by Cursor CLI)
+ * - Codex models: NO thinking controls (they use reasoningEffort instead)
  */
 export function modelSupportsThinking(_model?: ModelAlias | string): boolean {
+  if (!_model) return true;
+
+  // Cursor models - don't show thinking controls
+  if (_model.startsWith('cursor-')) {
+    return false;
+  }
+
+  // Codex models - use reasoningEffort, not thinkingLevel
+  if (_model.startsWith('codex-')) {
+    return false;
+  }
+
+  // Bare gpt- models (legacy) - assume Codex, no thinking controls
+  if (_model.startsWith('gpt-')) {
+    return false;
+  }
+
   // All Claude models support thinking
   return true;
 }
@@ -26,13 +50,12 @@ export function getProviderFromModel(model?: string): ModelProvider {
     return 'cursor';
   }
 
-  // Check for Codex/OpenAI models (gpt- prefix or o-series)
-  const CODEX_MODEL_PREFIXES = ['gpt-'];
-  const OPENAI_O_SERIES_PATTERN = /^o\d/;
+  // Check for Codex/OpenAI models (codex- prefix, gpt- prefix, or o-series)
   if (
-    CODEX_MODEL_PREFIXES.some((prefix) => model.startsWith(prefix)) ||
-    OPENAI_O_SERIES_PATTERN.test(model) ||
-    model.startsWith('codex:')
+    model.startsWith('codex-') ||
+    model.startsWith('codex:') ||
+    model.startsWith('gpt-') ||
+    /^o\d/.test(model)
   ) {
     return 'codex';
   }
@@ -50,14 +73,16 @@ export function getModelDisplayName(model: ModelAlias | string): string {
     sonnet: 'Claude Sonnet',
     opus: 'Claude Opus',
     // Codex models
-    'gpt-5.2': 'GPT-5.2',
-    'gpt-5.1-codex-max': 'GPT-5.1 Codex Max',
-    'gpt-5.1-codex': 'GPT-5.1 Codex',
-    'gpt-5.1-codex-mini': 'GPT-5.1 Codex Mini',
-    'gpt-5.1': 'GPT-5.1',
+    'codex-gpt-5.2': 'GPT-5.2',
+    'codex-gpt-5.1-codex-max': 'GPT-5.1 Codex Max',
+    'codex-gpt-5.1-codex': 'GPT-5.1 Codex',
+    'codex-gpt-5.1-codex-mini': 'GPT-5.1 Codex Mini',
+    'codex-gpt-5.1': 'GPT-5.1',
     // Cursor models (common ones)
     'cursor-auto': 'Cursor Auto',
     'cursor-composer-1': 'Composer 1',
+    'cursor-gpt-5.2': 'GPT-5.2',
+    'cursor-gpt-5.1': 'GPT-5.1',
   };
   return displayNames[model] || model;
 }

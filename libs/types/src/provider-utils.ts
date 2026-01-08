@@ -7,8 +7,8 @@
  */
 
 import type { ModelProvider } from './settings.js';
-import { CURSOR_MODEL_MAP, type CursorModelId } from './cursor-models.js';
-import { CLAUDE_MODEL_MAP, CODEX_MODEL_MAP, type CodexModelId } from './model.js';
+import { CURSOR_MODEL_MAP } from './cursor-models.js';
+import { CLAUDE_MODEL_MAP, CODEX_MODEL_MAP } from './model.js';
 import { OPENCODE_MODEL_CONFIG_MAP } from './opencode-models.js';
 
 /** Provider prefix constants */
@@ -16,14 +16,13 @@ export const PROVIDER_PREFIXES = {
   cursor: 'cursor-',
   codex: 'codex-',
   opencode: 'opencode-',
-  // Add new provider prefixes here
 } as const;
 
 /**
  * Check if a model string represents a Cursor model
  *
  * @param model - Model string to check (e.g., "cursor-composer-1" or "composer-1")
- * @returns true if the model is a Cursor model
+ * @returns true if the model is a Cursor model (excluding Codex-specific models)
  */
 export function isCursorModel(model: string | undefined | null): boolean {
   if (!model || typeof model !== 'string') return false;
@@ -33,8 +32,13 @@ export function isCursorModel(model: string | undefined | null): boolean {
     return true;
   }
 
-  // Check if it's a bare Cursor model ID
-  return model in CURSOR_MODEL_MAP;
+  // Check if it's a bare Cursor model ID (excluding Codex-specific models)
+  // Codex-specific models should always route to Codex provider, not Cursor
+  if (model in CURSOR_MODEL_MAP) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -69,7 +73,7 @@ export function isCodexModel(model: string | undefined | null): boolean {
     return true;
   }
 
-  // Check if it's a gpt- model
+  // Check if it's a gpt- model (bare gpt models go to Codex, not Cursor)
   if (model.startsWith('gpt-')) {
     return true;
   }
@@ -80,8 +84,7 @@ export function isCodexModel(model: string | undefined | null): boolean {
   }
 
   // Check if it's in the CODEX_MODEL_MAP
-  const modelValues = Object.values(CODEX_MODEL_MAP);
-  return modelValues.includes(model as CodexModelId);
+  return model in CODEX_MODEL_MAP;
 }
 
 /**
@@ -223,9 +226,8 @@ export function normalizeModelString(model: string | undefined | null): string {
   }
 
   // For Codex, bare gpt-* and o-series models are valid canonical forms
-  // Only add prefix if it's in CODEX_MODEL_MAP but doesn't have gpt-/o prefix
-  const codexModelValues = Object.values(CODEX_MODEL_MAP);
-  if (codexModelValues.includes(model as CodexModelId)) {
+  // Check if it's in the CODEX_MODEL_MAP
+  if (model in CODEX_MODEL_MAP) {
     // If it already starts with gpt- or o, it's canonical
     if (model.startsWith('gpt-') || /^o\d/.test(model)) {
       return model;

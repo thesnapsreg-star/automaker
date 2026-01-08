@@ -27,35 +27,30 @@ interface CodexModelInfo {
 }
 
 const CODEX_MODEL_INFO: Record<CodexModelId, CodexModelInfo> = {
-  'gpt-5.2-codex': {
-    id: 'gpt-5.2-codex',
+  'codex-gpt-5.2-codex': {
+    id: 'codex-gpt-5.2-codex',
     label: 'GPT-5.2-Codex',
     description: 'Most advanced agentic coding model for complex software engineering',
   },
-  'gpt-5-codex': {
-    id: 'gpt-5-codex',
-    label: 'GPT-5-Codex',
-    description: 'Purpose-built for Codex CLI with versatile tool use',
+  'codex-gpt-5.1-codex-max': {
+    id: 'codex-gpt-5.1-codex-max',
+    label: 'GPT-5.1-Codex-Max',
+    description: 'Optimized for long-horizon, agentic coding tasks in Codex',
   },
-  'gpt-5-codex-mini': {
-    id: 'gpt-5-codex-mini',
-    label: 'GPT-5-Codex-Mini',
-    description: 'Faster workflows optimized for low-latency code Q&A and editing',
+  'codex-gpt-5.1-codex-mini': {
+    id: 'codex-gpt-5.1-codex-mini',
+    label: 'GPT-5.1-Codex-Mini',
+    description: 'Smaller, more cost-effective version for faster workflows',
   },
-  'codex-1': {
-    id: 'codex-1',
-    label: 'Codex-1',
-    description: 'Version of o3 optimized for software engineering',
+  'codex-gpt-5.2': {
+    id: 'codex-gpt-5.2',
+    label: 'GPT-5.2',
+    description: 'Best general agentic model for tasks across industries and domains',
   },
-  'codex-mini-latest': {
-    id: 'codex-mini-latest',
-    label: 'Codex-Mini-Latest',
-    description: 'Version of o4-mini for Codex, optimized for faster workflows',
-  },
-  'gpt-5': {
-    id: 'gpt-5',
-    label: 'GPT-5',
-    description: 'GPT-5 base flagship model',
+  'codex-gpt-5.1': {
+    id: 'codex-gpt-5.1',
+    label: 'GPT-5.1',
+    description: 'Great for coding and agentic tasks across domains',
   },
 };
 
@@ -164,6 +159,11 @@ export function CodexModelConfiguration({
 }
 
 function supportsReasoningEffort(modelId: string): boolean {
-  const reasoningModels = ['gpt-5.2-codex', 'gpt-5-codex', 'gpt-5', 'codex-1'];
+  const reasoningModels = [
+    'codex-gpt-5.2-codex',
+    'codex-gpt-5.1-codex-max',
+    'codex-gpt-5.2',
+    'codex-gpt-5.1',
+  ];
   return reasoningModels.includes(modelId);
 }

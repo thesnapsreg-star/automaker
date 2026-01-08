@@ -2,14 +2,15 @@
  * Codex CLI Model IDs
  * Based on OpenAI Codex CLI official models
  * Reference: https://developers.openai.com/codex/models/
+ *
+ * IMPORTANT: All Codex models use 'codex-' prefix to distinguish from Cursor CLI models
  */
 export type CodexModelId =
-  | 'gpt-5.2-codex' // Most advanced agentic coding model for complex software engineering
-  | 'gpt-5-codex' // Purpose-built for Codex CLI with versatile tool use
-  | 'gpt-5-codex-mini' // Faster workflows optimized for low-latency code Q&A and editing
-  | 'codex-1' // Version of o3 optimized for software engineering
-  | 'codex-mini-latest' // Version of o4-mini for Codex, optimized for faster workflows
-  | 'gpt-5'; // GPT-5 base flagship model
+  | 'codex-gpt-5.2-codex'
+  | 'codex-gpt-5.1-codex-max'
+  | 'codex-gpt-5.1-codex-mini'
+  | 'codex-gpt-5.2'
+  | 'codex-gpt-5.1';
 
 /**
  * Codex model metadata
@@ -25,47 +26,41 @@ export interface CodexModelConfig {
 
 /**
  * Complete model map for Codex CLI
+ * All keys use 'codex-' prefix to distinguish from Cursor CLI models
  */
 export const CODEX_MODEL_CONFIG_MAP: Record<CodexModelId, CodexModelConfig> = {
-  'gpt-5.2-codex': {
-    id: 'gpt-5.2-codex',
+  'codex-gpt-5.2-codex': {
+    id: 'codex-gpt-5.2-codex',
     label: 'GPT-5.2-Codex',
     description: 'Most advanced agentic coding model for complex software engineering',
     hasThinking: true,
-    supportsVision: true, // GPT-5 supports vision
+    supportsVision: true,
   },
-  'gpt-5-codex': {
-    id: 'gpt-5-codex',
-    label: 'GPT-5-Codex',
-    description: 'Purpose-built for Codex CLI with versatile tool use',
+  'codex-gpt-5.1-codex-max': {
+    id: 'codex-gpt-5.1-codex-max',
+    label: 'GPT-5.1-Codex-Max',
+    description: 'Optimized for long-horizon, agentic coding tasks in Codex',
     hasThinking: true,
     supportsVision: true,
   },
-  'gpt-5-codex-mini': {
-    id: 'gpt-5-codex-mini',
-    label: 'GPT-5-Codex-Mini',
-    description: 'Faster workflows optimized for low-latency code Q&A and editing',
+  'codex-gpt-5.1-codex-mini': {
+    id: 'codex-gpt-5.1-codex-mini',
+    label: 'GPT-5.1-Codex-Mini',
+    description: 'Smaller, more cost-effective version for faster workflows',
     hasThinking: false,
     supportsVision: true,
   },
-  'codex-1': {
-    id: 'codex-1',
-    label: 'Codex-1',
-    description: 'Version of o3 optimized for software engineering',
+  'codex-gpt-5.2': {
+    id: 'codex-gpt-5.2',
+    label: 'GPT-5.2 (Codex)',
+    description: 'Best general agentic model for tasks across industries and domains via Codex',
     hasThinking: true,
     supportsVision: true,
   },
-  'codex-mini-latest': {
-    id: 'codex-mini-latest',
-    label: 'Codex-Mini-Latest',
-    description: 'Version of o4-mini for Codex, optimized for faster workflows',
-    hasThinking: false,
-    supportsVision: true,
-  },
-  'gpt-5': {
-    id: 'gpt-5',
-    label: 'GPT-5',
-    description: 'GPT-5 base flagship model',
+  'codex-gpt-5.1': {
+    id: 'codex-gpt-5.1',
+    label: 'GPT-5.1 (Codex)',
+    description: 'Great for coding and agentic tasks across domains via Codex',
     hasThinking: true,
     supportsVision: true,
   },

@@ -1177,7 +1177,7 @@ const initialState: AppState = {
   enabledCursorModels: getAllCursorModelIds(), // All Cursor models enabled by default
   cursorDefaultModel: 'auto', // Default to auto selection
   enabledCodexModels: getAllCodexModelIds(), // All Codex models enabled by default
-  codexDefaultModel: 'gpt-5.2-codex', // Default to GPT-5.2-Codex
+  codexDefaultModel: 'codex-gpt-5.2-codex', // Default to GPT-5.2-Codex
   codexAutoLoadAgents: false, // Default to disabled (user must opt-in)
   codexSandboxMode: 'workspace-write', // Default to workspace-write for safety
   codexApprovalPolicy: 'on-request', // Default to on-request for balanced safety

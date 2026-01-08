@@ -11,23 +11,23 @@ export const CLAUDE_MODEL_MAP: Record<string, string> = {
  * Codex/OpenAI model identifiers
  * Based on OpenAI Codex CLI official models
  * See: https://developers.openai.com/codex/models/
+ *
+ * IMPORTANT: All Codex models use 'codex-' prefix to distinguish from Cursor CLI models
  */
 export const CODEX_MODEL_MAP = {
-  // Codex-specific models
+  // Recommended Codex-specific models
   /** Most advanced agentic coding model for complex software engineering (default for ChatGPT users) */
-  gpt52Codex: 'gpt-5.2-codex',
-  /** Purpose-built for Codex CLI with versatile tool use (default for CLI users) */
-  gpt5Codex: 'gpt-5-codex',
-  /** Faster workflows optimized for low-latency code Q&A and editing */
-  gpt5CodexMini: 'gpt-5-codex-mini',
-  /** Version of o3 optimized for software engineering */
-  codex1: 'codex-1',
-  /** Version of o4-mini for Codex, optimized for faster workflows */
-  codexMiniLatest: 'codex-mini-latest',
+  gpt52Codex: 'codex-gpt-5.2-codex',
+  /** Optimized for long-horizon, agentic coding tasks in Codex */
+  gpt51CodexMax: 'codex-gpt-5.1-codex-max',
+  /** Smaller, more cost-effective version for faster workflows */
+  gpt51CodexMini: 'codex-gpt-5.1-codex-mini',
 
-  // Base GPT-5 model (also available in Codex)
-  /** GPT-5 base flagship model */
-  gpt5: 'gpt-5',
+  // General-purpose GPT models (also available in Codex)
+  /** Best general agentic model for tasks across industries and domains */
+  gpt52: 'codex-gpt-5.2',
+  /** Great for coding and agentic tasks across domains */
+  gpt51: 'codex-gpt-5.1',
 } as const;
 
 export const CODEX_MODEL_IDS = Object.values(CODEX_MODEL_MAP);
@@ -38,9 +38,9 @@ export const CODEX_MODEL_IDS = Object.values(CODEX_MODEL_MAP);
  */
 export const REASONING_CAPABLE_MODELS = new Set([
   CODEX_MODEL_MAP.gpt52Codex,
-  CODEX_MODEL_MAP.gpt5Codex,
-  CODEX_MODEL_MAP.gpt5,
-  CODEX_MODEL_MAP.codex1, // o3-based model
+  CODEX_MODEL_MAP.gpt51CodexMax,
+  CODEX_MODEL_MAP.gpt52,
+  CODEX_MODEL_MAP.gpt51,
 ]);
 
 /**
