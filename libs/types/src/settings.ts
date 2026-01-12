@@ -384,24 +384,6 @@ export interface GlobalSettings {
   /** Mute completion notification sound */
   muteDoneSound: boolean;
 
-  // Notification Command
-  /** Custom command to execute for all notifications (empty = disabled) */
-  notificationCommand: string;
-  /** How to pass notification data to the command */
-  notificationCommandMode: 'args' | 'stdin' | 'env';
-
-  // ntfy.sh Notifications
-  /** Enable ntfy.sh notifications for task completion */
-  ntfyEnabled: boolean;
-  /** ntfy.sh server URL (default: https://ntfy.sh) */
-  ntfyServerUrl: string;
-  /** ntfy.sh topic to publish notifications to */
-  ntfyTopic: string;
-  /** Optional authentication token for private ntfy servers */
-  ntfyAuthToken?: string;
-  /** Priority for ntfy notifications (1-5, default: 3) */
-  ntfyPriority: 1 | 2 | 3 | 4 | 5;
-
   // AI Commit Message Generation
   /** Enable AI-generated commit messages when opening commit dialog (default: true) */
   enableAiCommitMessages: boolean;
@@ -728,13 +710,6 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultPlanningMode: 'skip',
   defaultRequirePlanApproval: false,
   muteDoneSound: false,
-  notificationCommand: '',
-  notificationCommandMode: 'args',
-  ntfyEnabled: false,
-  ntfyServerUrl: 'https://ntfy.sh',
-  ntfyTopic: '',
-  ntfyAuthToken: undefined,
-  ntfyPriority: 3,
   enableAiCommitMessages: true,
   phaseModels: DEFAULT_PHASE_MODELS,
   enhancementModel: 'sonnet',
