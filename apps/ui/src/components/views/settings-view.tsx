@@ -69,6 +69,8 @@ export function SettingsView() {
       name: project.name,
       path: project.path,
       theme: project.theme as Theme | undefined,
+      icon: project.icon,
+      customIconPath: project.customIconPath,
     };
   };
 

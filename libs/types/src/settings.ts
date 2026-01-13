@@ -293,6 +293,10 @@ export interface ProjectRef {
   theme?: string;
   /** Whether project is pinned to favorites on dashboard */
   isFavorite?: boolean;
+  /** Lucide icon name for project identification */
+  icon?: string;
+  /** Custom icon image path for project switcher */
+  customIconPath?: string;
 }
 
 /**
@@ -599,6 +603,10 @@ export interface ProjectSettings {
   // Board Customization
   /** Project-specific board background settings */
   boardBackground?: BoardBackgroundSettings;
+
+  // Project Branding
+  /** Custom icon image path for project switcher (relative to .automaker/) */
+  customIconPath?: string;
 
   // UI Visibility
   /** Whether the worktree panel row is visible (default: true) */
