@@ -25,6 +25,21 @@ fi
 chown -R automaker:automaker /home/automaker/.cursor
 chmod -R 700 /home/automaker/.cursor
 
+# Ensure OpenCode CLI config directory exists with correct permissions
+# OpenCode stores config and auth in ~/.local/share/opencode/
+if [ ! -d "/home/automaker/.local/share/opencode" ]; then
+    mkdir -p /home/automaker/.local/share/opencode
+fi
+chown -R automaker:automaker /home/automaker/.local/share/opencode
+chmod -R 700 /home/automaker/.local/share/opencode
+
+# OpenCode also uses ~/.config/opencode for configuration
+if [ ! -d "/home/automaker/.config/opencode" ]; then
+    mkdir -p /home/automaker/.config/opencode
+fi
+chown -R automaker:automaker /home/automaker/.config/opencode
+chmod -R 700 /home/automaker/.config/opencode
+
 # If CURSOR_AUTH_TOKEN is set, write it to the cursor auth file
 # On Linux, cursor-agent uses ~/.config/cursor/auth.json for file-based credential storage
 # The env var CURSOR_AUTH_TOKEN is also checked directly by cursor-agent
