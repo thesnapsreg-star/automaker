@@ -43,6 +43,7 @@ services:
       - NODE_ENV=development
       - PORT=3008
       - CORS_ORIGIN=http://localhost:3007
+      - HUSKY=0
 
       # Optional - restrict to specific directory within container
       - ALLOWED_ROOT_DIRECTORY=${ALLOWED_ROOT_DIRECTORY:-/projects}

@@ -1,7 +1,8 @@
 #!/bin/bash
 # Automaker TUI Launcher - Interactive menu for launching Automaker in different modes
-# Supports: Web Browser, Desktop (Electron), Desktop + Debug
-# Features: Terminal responsiveness, history, pre-flight checks, cross-platform detection
+# Supports: Web Browser, Desktop (Electron), Docker Dev, Electron + Docker API
+# Platforms: Linux, macOS, Windows (Git Bash, WSL, MSYS2, Cygwin)
+# Features: Terminal responsiveness, history, pre-flight checks, port management
 
 set -e
 
@@ -18,10 +19,30 @@ MENU_BOX_WIDTH=60
 MENU_INNER_WIDTH=58
 LOGO_WIDTH=52
 INPUT_TIMEOUT=30
+SELECTED_OPTION=1
+MAX_OPTIONS=4
 
-# Extract VERSION from package.json
-VERSION=$(grep '"version"' "$SCRIPT_DIR/package.json" | head -1 | sed 's/[^0-9.]*\([0-9.]*\).*/v\1/')
-NODE_VER=$(node -v 2>/dev/null || echo "unknown")
+# Platform detection (set early for cross-platform compatibility)
+IS_WINDOWS=false
+IS_MACOS=false
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "mingw"* ]]; then
+    IS_WINDOWS=true
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    IS_MACOS=true
+fi
+
+# Port configuration
+DEFAULT_WEB_PORT=3007
+DEFAULT_SERVER_PORT=3008
+WEB_PORT=$DEFAULT_WEB_PORT
+SERVER_PORT=$DEFAULT_SERVER_PORT
+
+# Extract VERSION from package.json (using node for reliable JSON parsing)
+if command -v node &> /dev/null; then
+    VERSION="v$(node -p "require('./package.json').version" 2>/dev/null || echo "0.0.0")"
+else
+    VERSION=$(grep '"version"' "$SCRIPT_DIR/package.json" | head -1 | sed 's/.*"version"[^"]*"\([^"]*\)".*/v\1/')
+fi
 
 # ANSI Color codes (256-color palette)
 ESC=$(printf '\033')
@@ -58,7 +79,8 @@ USAGE:
 MODES:
   web              Launch in web browser (localhost:3007)
   electron         Launch as desktop app (Electron)
-  electron-debug   Launch with DevTools open
+  docker           Launch in Docker container (dev with live reload)
+  docker-electron  Launch Electron with Docker API backend
 
 OPTIONS:
   --help           Show this help message
@@ -71,23 +93,28 @@ EXAMPLES:
   start-automaker.sh              # Interactive menu
   start-automaker.sh web          # Launch web mode directly
   start-automaker.sh electron     # Launch desktop app directly
+  start-automaker.sh docker       # Launch Docker dev container
   start-automaker.sh --version    # Show version
 
 KEYBOARD SHORTCUTS (in menu):
-  1-3              Select mode
+  Up/Down arrows   Navigate between options
+  Enter            Select highlighted option
+  1-4              Jump to and select mode
   Q                Exit
-  Up/Down          Navigate (coming soon)
 
 HISTORY:
   Your last selected mode is remembered in: ~/.automaker_launcher_history
   Use --no-history to disable this feature
+
+PLATFORMS:
+  Linux, macOS, Windows (Git Bash, WSL, MSYS2, Cygwin)
 
 EOF
 }
 
 show_version() {
     echo "Automaker Launcher $VERSION"
-    echo "Node.js: $NODE_VER"
+    echo "Node.js: $(node -v 2>/dev/null || echo 'not installed')"
     echo "Bash: ${BASH_VERSION%.*}"
 }
 
@@ -113,7 +140,7 @@ parse_args() {
             --no-history)
                 NO_HISTORY=true
                 ;;
-            web|electron|electron-debug)
+            web|electron|docker|docker-electron)
                 MODE="$1"
                 ;;
             *)
@@ -131,11 +158,14 @@ parse_args() {
 # ============================================================================
 
 check_platform() {
-    # Detect if running on Windows (Git Bash, WSL, or native PowerShell)
-    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
-        echo "${C_RED}Error:${RESET} This script requires bash on Unix-like systems (Linux, macOS, WSL)."
-        echo "On Windows, use PowerShell or WSL instead."
-        exit 1
+    # Platform already detected at script start
+    # This function is kept for any additional platform-specific checks
+    if [ "$IS_WINDOWS" = true ]; then
+        # Check if running in a proper terminal
+        if [ -z "$TERM" ]; then
+            echo "${C_YELLOW}Warning:${RESET} Running on Windows without proper terminal."
+            echo "For best experience, use Git Bash, WSL, or Windows Terminal."
+        fi
     fi
 }
 
@@ -163,6 +193,162 @@ check_required_commands() {
     fi
 }
 
+check_docker() {
+    if ! command -v docker &> /dev/null; then
+        echo "${C_RED}Error:${RESET} Docker is not installed or not in PATH"
+        echo "Please install Docker from https://docs.docker.com/get-docker/"
+        return 1
+    fi
+
+    if ! docker info &> /dev/null; then
+        echo "${C_RED}Error:${RESET} Docker daemon is not running"
+        echo "Please start Docker and try again"
+        return 1
+    fi
+
+    return 0
+}
+
+check_running_electron() {
+    local electron_pids=""
+
+    if [ "$IS_WINDOWS" = true ]; then
+        # Windows: look for electron.exe or Automaker.exe
+        electron_pids=$(tasklist 2>/dev/null | grep -iE "electron|automaker" | awk '{print $2}' | tr '\n' ' ' || true)
+    else
+        # Unix: look for electron or Automaker processes
+        electron_pids=$(pgrep -f "electron.*automaker|Automaker" 2>/dev/null | tr '\n' ' ' || true)
+    fi
+
+    if [ -n "$electron_pids" ] && [ "$electron_pids" != " " ]; then
+        get_term_size
+        echo ""
+        center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+        center_print "Running Electron App Detected" "$C_YELLOW"
+        center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+        echo ""
+        center_print "Electron process(es): $electron_pids" "$C_MUTE"
+        echo ""
+        center_print "What would you like to do?" "$C_WHITE"
+        echo ""
+        center_print "[K] Kill Electron and continue" "$C_GREEN"
+        center_print "[I] Ignore and continue anyway" "$C_MUTE"
+        center_print "[C] Cancel" "$C_RED"
+        echo ""
+
+        while true; do
+            local choice_pad=$(( (TERM_COLS - 20) / 2 ))
+            printf "%${choice_pad}s" ""
+            read -r -p "Choice: " choice
+
+            case "${choice,,}" in
+                k|kill)
+                    echo ""
+                    center_print "Killing Electron processes..." "$C_YELLOW"
+                    if [ "$IS_WINDOWS" = true ]; then
+                        taskkill //F //IM "electron.exe" 2>/dev/null || true
+                        taskkill //F //IM "Automaker.exe" 2>/dev/null || true
+                    else
+                        pkill -f "electron.*automaker" 2>/dev/null || true
+                        pkill -f "Automaker" 2>/dev/null || true
+                    fi
+                    sleep 1
+                    center_print "✓ Electron stopped" "$C_GREEN"
+                    echo ""
+                    return 0
+                    ;;
+                i|ignore)
+                    echo ""
+                    center_print "Continuing without stopping Electron..." "$C_MUTE"
+                    echo ""
+                    return 0
+                    ;;
+                c|cancel)
+                    echo ""
+                    center_print "Cancelled." "$C_MUTE"
+                    echo ""
+                    exit 0
+                    ;;
+                *)
+                    center_print "Invalid choice. Please enter K, I, or C." "$C_RED"
+                    ;;
+            esac
+        done
+    fi
+
+    return 0
+}
+
+check_running_containers() {
+    local compose_file="$1"
+    local running_containers=""
+
+    # Get list of running automaker containers
+    running_containers=$(docker ps --filter "name=automaker-dev" --format "{{.Names}}" 2>/dev/null | tr '\n' ' ')
+
+    if [ -n "$running_containers" ] && [ "$running_containers" != " " ]; then
+        get_term_size
+        echo ""
+        center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+        center_print "Existing Containers Detected" "$C_YELLOW"
+        center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+        echo ""
+        center_print "Running containers: $running_containers" "$C_MUTE"
+        echo ""
+        center_print "What would you like to do?" "$C_WHITE"
+        echo ""
+        center_print "[S] Stop containers and start fresh" "$C_GREEN"
+        center_print "[R] Restart containers (rebuild)" "$C_MUTE"
+        center_print "[A] Attach to existing containers" "$C_MUTE"
+        center_print "[C] Cancel" "$C_RED"
+        echo ""
+
+        while true; do
+            local choice_pad=$(( (TERM_COLS - 20) / 2 ))
+            printf "%${choice_pad}s" ""
+            read -r -p "Choice: " choice
+
+            case "${choice,,}" in
+                s|stop)
+                    echo ""
+                    center_print "Stopping existing containers..." "$C_YELLOW"
+                    docker compose -f "$compose_file" down 2>/dev/null || true
+                    # Also try stopping any orphaned containers
+                    docker ps --filter "name=automaker-dev" -q 2>/dev/null | xargs -r docker stop 2>/dev/null || true
+                    center_print "✓ Containers stopped" "$C_GREEN"
+                    echo ""
+                    return 0  # Continue with fresh start
+                    ;;
+                r|restart)
+                    echo ""
+                    center_print "Stopping and rebuilding containers..." "$C_YELLOW"
+                    docker compose -f "$compose_file" down 2>/dev/null || true
+                    center_print "✓ Ready to rebuild" "$C_GREEN"
+                    echo ""
+                    return 0  # Continue with rebuild
+                    ;;
+                a|attach)
+                    echo ""
+                    center_print "Attaching to existing containers..." "$C_GREEN"
+                    echo ""
+                    return 2  # Special code for attach
+                    ;;
+                c|cancel)
+                    echo ""
+                    center_print "Cancelled." "$C_MUTE"
+                    echo ""
+                    exit 0
+                    ;;
+                *)
+                    center_print "Invalid choice. Please enter S, R, A, or C." "$C_RED"
+                    ;;
+            esac
+        done
+    fi
+
+    return 0  # No containers running, continue normally
+}
+
 check_dependencies() {
     if [ "$CHECK_DEPS" = false ]; then
         return 0
@@ -180,6 +366,137 @@ check_dependencies() {
     fi
 
     return 0
+}
+
+# ============================================================================
+# PORT MANAGEMENT (Cross-platform)
+# ============================================================================
+
+get_pids_on_port() {
+    local port=$1
+
+    if [ "$IS_WINDOWS" = true ]; then
+        # Windows: use netstat
+        netstat -ano 2>/dev/null | grep ":$port " | grep "LISTENING" | awk '{print $5}' | sort -u | tr '\n' ' ' || true
+    else
+        # Unix: use lsof
+        lsof -ti:"$port" 2>/dev/null || true
+    fi
+}
+
+is_port_in_use() {
+    local port=$1
+    local pids
+    pids=$(get_pids_on_port "$port")
+    [ -n "$pids" ] && [ "$pids" != " " ]
+}
+
+kill_port() {
+    local port=$1
+    local pids
+    pids=$(get_pids_on_port "$port")
+
+    if [ -z "$pids" ] || [ "$pids" = " " ]; then
+        echo "${C_GREEN}✓${RESET} Port $port is available"
+        return 0
+    fi
+
+    echo "${C_YELLOW}Killing process(es) on port $port: $pids${RESET}"
+
+    if [ "$IS_WINDOWS" = true ]; then
+        # Windows: use taskkill
+        for pid in $pids; do
+            taskkill //F //PID "$pid" 2>/dev/null || true
+        done
+    else
+        # Unix: use kill
+        echo "$pids" | xargs kill -9 2>/dev/null || true
+    fi
+
+    # Wait for port to be freed
+    local i=0
+    while [ $i -lt 10 ]; do
+        sleep 0.5 2>/dev/null || sleep 1
+        if ! is_port_in_use "$port"; then
+            echo "${C_GREEN}✓${RESET} Port $port is now free"
+            return 0
+        fi
+        i=$((i + 1))
+    done
+
+    echo "${C_RED}Warning:${RESET} Port $port may still be in use"
+    return 1
+}
+
+check_ports() {
+    show_cursor
+    stty echo 2>/dev/null || true
+
+    local web_in_use=false
+    local server_in_use=false
+
+    if is_port_in_use "$DEFAULT_WEB_PORT"; then
+        web_in_use=true
+    fi
+    if is_port_in_use "$DEFAULT_SERVER_PORT"; then
+        server_in_use=true
+    fi
+
+    if [ "$web_in_use" = true ] || [ "$server_in_use" = true ]; then
+        echo ""
+        if [ "$web_in_use" = true ]; then
+            local pids
+            pids=$(get_pids_on_port "$DEFAULT_WEB_PORT")
+            echo "${C_YELLOW}⚠${RESET}  Port $DEFAULT_WEB_PORT is in use by process(es): $pids"
+        fi
+        if [ "$server_in_use" = true ]; then
+            local pids
+            pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT")
+            echo "${C_YELLOW}⚠${RESET}  Port $DEFAULT_SERVER_PORT is in use by process(es): $pids"
+        fi
+        echo ""
+
+        while true; do
+            read -r -p "What would you like to do? (k)ill processes, (u)se different ports, or (c)ancel: " choice
+            case "${choice,,}" in
+                k|kill)
+                    if [ "$web_in_use" = true ]; then
+                        kill_port "$DEFAULT_WEB_PORT"
+                    else
+                        echo "${C_GREEN}✓${RESET} Port $DEFAULT_WEB_PORT is available"
+                    fi
+                    if [ "$server_in_use" = true ]; then
+                        kill_port "$DEFAULT_SERVER_PORT"
+                    else
+                        echo "${C_GREEN}✓${RESET} Port $DEFAULT_SERVER_PORT is available"
+                    fi
+                    break
+                    ;;
+                u|use)
+                    read -r -p "Enter web port (default $DEFAULT_WEB_PORT): " input_web
+                    WEB_PORT=${input_web:-$DEFAULT_WEB_PORT}
+                    read -r -p "Enter server port (default $DEFAULT_SERVER_PORT): " input_server
+                    SERVER_PORT=${input_server:-$DEFAULT_SERVER_PORT}
+                    echo "${C_GREEN}Using ports: Web=$WEB_PORT, Server=$SERVER_PORT${RESET}"
+                    break
+                    ;;
+                c|cancel)
+                    echo "${C_MUTE}Cancelled.${RESET}"
+                    exit 0
+                    ;;
+                *)
+                    echo "${C_RED}Invalid choice. Please enter k, u, or c.${RESET}"
+                    ;;
+            esac
+        done
+        echo ""
+    else
+        echo "${C_GREEN}✓${RESET} Port $DEFAULT_WEB_PORT is available"
+        echo "${C_GREEN}✓${RESET} Port $DEFAULT_SERVER_PORT is available"
+    fi
+
+    hide_cursor
+    stty -echo 2>/dev/null || true
 }
 
 validate_terminal_size() {
@@ -287,9 +604,27 @@ show_menu() {
     draw_line "─" "$C_GRAY" "$MENU_INNER_WIDTH"
     printf "╮${RESET}\n"
 
-    printf "%s${border}  ${C_ACC}▸${RESET} ${C_PRI}[1]${RESET} 🌐  ${C_WHITE}Web Browser${RESET}       ${C_MUTE}localhost:3007${RESET}              ${border}\n" "$pad"
-    printf "%s${border}    ${C_MUTE}[2]${RESET} 🖥   ${C_MUTE}Desktop App${RESET}       ${DIM}Electron${RESET}                    ${border}\n" "$pad"
-    printf "%s${border}    ${C_MUTE}[3]${RESET} 🔧  ${C_MUTE}Desktop + Debug${RESET}   ${DIM}Electron + DevTools${RESET}         ${border}\n" "$pad"
+    # Menu items with selection indicator
+    local sel1="" sel2="" sel3="" sel4=""
+    local txt1="${C_MUTE}" txt2="${C_MUTE}" txt3="${C_MUTE}" txt4="${C_MUTE}"
+
+    case $SELECTED_OPTION in
+        1) sel1="${C_ACC}▸${RESET} ${C_PRI}"; txt1="${C_WHITE}" ;;
+        2) sel2="${C_ACC}▸${RESET} ${C_PRI}"; txt2="${C_WHITE}" ;;
+        3) sel3="${C_ACC}▸${RESET} ${C_PRI}"; txt3="${C_WHITE}" ;;
+        4) sel4="${C_ACC}▸${RESET} ${C_PRI}"; txt4="${C_WHITE}" ;;
+    esac
+
+    # Default non-selected prefix
+    [[ -z "$sel1" ]] && sel1="  ${C_MUTE}"
+    [[ -z "$sel2" ]] && sel2="  ${C_MUTE}"
+    [[ -z "$sel3" ]] && sel3="  ${C_MUTE}"
+    [[ -z "$sel4" ]] && sel4="  ${C_MUTE}"
+
+    printf "%s${border}${sel1}[1]${RESET} 🌐  ${txt1}Web Browser${RESET}       ${C_MUTE}localhost:$WEB_PORT${RESET}             ${border}\n" "$pad"
+    printf "%s${border}${sel2}[2]${RESET} 🖥   ${txt2}Desktop App${RESET}       ${DIM}Electron${RESET}                    ${border}\n" "$pad"
+    printf "%s${border}${sel3}[3]${RESET} 🐳  ${txt3}Docker Dev${RESET}        ${DIM}Live Reload${RESET}                 ${border}\n" "$pad"
+    printf "%s${border}${sel4}[4]${RESET} 🔗  ${txt4}Electron+Docker${RESET}   ${DIM}Local UI, Container API${RESET}     ${border}\n" "$pad"
 
     printf "%s${C_GRAY}├" "$pad"
     draw_line "─" "$C_GRAY" "$MENU_INNER_WIDTH"
@@ -302,13 +637,14 @@ show_menu() {
     printf "╯${RESET}\n"
 
     echo ""
-    local footer_text="Use keys [1-3] or [Q] to select"
+    local footer_text="[↑↓] Navigate  [Enter] Select  [1-4] Jump  [Q] Exit"
     local f_pad=$(( (TERM_COLS - ${#footer_text}) / 2 ))
     printf "%${f_pad}s" ""
     echo -e "${DIM}${footer_text}${RESET}"
 
     if [ -f "$HISTORY_FILE" ]; then
-        local last_mode=$(cat "$HISTORY_FILE" 2>/dev/null || echo "")
+        local last_mode
+        last_mode=$(cat "$HISTORY_FILE" 2>/dev/null || echo "")
         if [ -n "$last_mode" ]; then
             local hint_text="(Last: $last_mode)"
             local h_pad=$(( (TERM_COLS - ${#hint_text}) / 2 ))
@@ -324,50 +660,145 @@ show_menu() {
 
 spinner() {
     local text="$1"
-    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local -a frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
     local i=0
     local count=0
-    local max_frames=20  # Max 1.6 seconds
+    local max_frames=20  # Max 2 seconds
+
+    # Ensure TERM_COLS is set
+    [ -z "$TERM_COLS" ] && TERM_COLS=80
 
     while [ $count -lt $max_frames ]; do
         local len=${#text}
         local pad_left=$(( (TERM_COLS - len - 4) / 2 ))
+        [ $pad_left -lt 0 ] && pad_left=0
         printf "\r%${pad_left}s${C_PRI}${frames[$i]}${RESET} ${C_WHITE}%s${RESET}" "" "$text"
         i=$(( (i + 1) % ${#frames[@]} ))
         count=$((count + 1))
-        sleep 0.08
+        sleep 0.1 2>/dev/null || sleep 1
     done
 
-    local pad_left=$(( (TERM_COLS - ${#text} - 4) / 2 ))
+    local len=${#text}
+    local pad_left=$(( (TERM_COLS - len - 4) / 2 ))
+    [ $pad_left -lt 0 ] && pad_left=0
     printf "\r%${pad_left}s${C_GREEN}✓${RESET} ${C_WHITE}%s${RESET}   \n" "" "$text"
 }
 
-real_initialization() {
-    # Perform actual initialization checks
-    local checks_passed=0
+center_print() {
+    local text="$1"
+    local color="${2:-}"
+    local len=${#text}
+    local pad=$(( (TERM_COLS - len) / 2 ))
+    [ $pad -lt 0 ] && pad=0
+    printf "%${pad}s${color}%s${RESET}\n" "" "$text"
+}
 
-    # Check if node_modules exists
-    if [ -d "node_modules" ]; then
-        ((checks_passed++))
+resolve_port_conflicts() {
+    # Ensure terminal is in proper state for input
+    show_cursor
+    stty echo 2>/dev/null || true
+
+    local web_in_use=false
+    local server_in_use=false
+    local web_pids=""
+    local server_pids=""
+
+    if is_port_in_use "$DEFAULT_WEB_PORT"; then
+        web_in_use=true
+        web_pids=$(get_pids_on_port "$DEFAULT_WEB_PORT")
+    fi
+    if is_port_in_use "$DEFAULT_SERVER_PORT"; then
+        server_in_use=true
+        server_pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT")
     fi
 
-    # Check if build files exist
-    if [ -d "dist" ] || [ -d "apps/ui/dist" ]; then
-        ((checks_passed++))
+    if [ "$web_in_use" = true ] || [ "$server_in_use" = true ]; then
+        echo ""
+        if [ "$web_in_use" = true ]; then
+            center_print "⚠  Port $DEFAULT_WEB_PORT is in use by process(es): $web_pids" "$C_YELLOW"
+        fi
+        if [ "$server_in_use" = true ]; then
+            center_print "⚠  Port $DEFAULT_SERVER_PORT is in use by process(es): $server_pids" "$C_YELLOW"
+        fi
+        echo ""
+
+        # Show options
+        center_print "What would you like to do?" "$C_WHITE"
+        echo ""
+        center_print "[K] Kill processes and continue" "$C_GREEN"
+        center_print "[U] Use different ports" "$C_MUTE"
+        center_print "[C] Cancel" "$C_RED"
+        echo ""
+
+        while true; do
+            local choice_pad=$(( (TERM_COLS - 20) / 2 ))
+            printf "%${choice_pad}s" ""
+            read -r -p "Choice: " choice
+
+            case "${choice,,}" in
+                k|kill)
+                    echo ""
+                    if [ "$web_in_use" = true ]; then
+                        center_print "Killing process(es) on port $DEFAULT_WEB_PORT..." "$C_YELLOW"
+                        kill_port "$DEFAULT_WEB_PORT" > /dev/null 2>&1 || true
+                        center_print "✓ Port $DEFAULT_WEB_PORT is now free" "$C_GREEN"
+                    fi
+                    if [ "$server_in_use" = true ]; then
+                        center_print "Killing process(es) on port $DEFAULT_SERVER_PORT..." "$C_YELLOW"
+                        kill_port "$DEFAULT_SERVER_PORT" > /dev/null 2>&1 || true
+                        center_print "✓ Port $DEFAULT_SERVER_PORT is now free" "$C_GREEN"
+                    fi
+                    break
+                    ;;
+                u|use)
+                    echo ""
+                    local input_pad=$(( (TERM_COLS - 40) / 2 ))
+                    printf "%${input_pad}s" ""
+                    read -r -p "Enter web port (default $DEFAULT_WEB_PORT): " input_web
+                    WEB_PORT=${input_web:-$DEFAULT_WEB_PORT}
+                    printf "%${input_pad}s" ""
+                    read -r -p "Enter server port (default $DEFAULT_SERVER_PORT): " input_server
+                    SERVER_PORT=${input_server:-$DEFAULT_SERVER_PORT}
+                    center_print "Using ports: Web=$WEB_PORT, Server=$SERVER_PORT" "$C_GREEN"
+                    break
+                    ;;
+                c|cancel)
+                    echo ""
+                    center_print "Cancelled." "$C_MUTE"
+                    echo ""
+                    exit 0
+                    ;;
+                *)
+                    center_print "Invalid choice. Please enter K, U, or C." "$C_RED"
+                    ;;
+            esac
+        done
+    else
+        center_print "✓ Port $DEFAULT_WEB_PORT is available" "$C_GREEN"
+        center_print "✓ Port $DEFAULT_SERVER_PORT is available" "$C_GREEN"
     fi
 
-    return 0
+    # Restore terminal state
+    hide_cursor
+    stty -echo 2>/dev/null || true
 }
 
 launch_sequence() {
     local mode_name="$1"
 
+    # Ensure terminal size is available
+    get_term_size
+
     echo ""
-    echo ""
+
+    # Show port checking for modes that use local ports
+    if [[ "$MODE" == "web" || "$MODE" == "electron" ]]; then
+        center_print "Checking ports ${DEFAULT_WEB_PORT} and ${DEFAULT_SERVER_PORT}..." "$C_MUTE"
+        resolve_port_conflicts
+        echo ""
+    fi
 
     spinner "Initializing environment..."
-    real_initialization
-
     spinner "Starting $mode_name..."
 
     echo ""
@@ -375,12 +806,21 @@ launch_sequence() {
     local pad=$(( (TERM_COLS - ${#msg}) / 2 ))
     printf "%${pad}s${C_GREEN}${BOLD}%s${RESET}\n" "" "$msg"
 
-    if [ "$MODE" == "web" ]; then
-        local url="http://localhost:3007"
-        local upad=$(( (TERM_COLS - ${#url} - 10) / 2 ))
-        echo ""
-        printf "%${upad}s${DIM}Opening ${C_SEC}%s${RESET}\n" "" "$url"
-    fi
+    case "$MODE" in
+        web)
+            local url="http://localhost:$WEB_PORT"
+            local upad=$(( (TERM_COLS - ${#url} - 10) / 2 ))
+            echo ""
+            printf "%${upad}s${DIM}Opening ${C_SEC}%s${RESET}\n" "" "$url"
+            ;;
+        docker|docker-electron)
+            echo ""
+            local ui_msg="UI: http://localhost:$DEFAULT_WEB_PORT"
+            local api_msg="API: http://localhost:$DEFAULT_SERVER_PORT"
+            center_text "${DIM}${ui_msg}${RESET}"
+            center_text "${DIM}${api_msg}${RESET}"
+            ;;
+    esac
     echo ""
 }
 
@@ -418,28 +858,69 @@ fi
 hide_cursor
 stty -echo 2>/dev/null || true
 
+# Function to read a single key, handling escape sequences for arrows
+read_key() {
+    local key
+    local extra
+
+    if [ -n "$ZSH_VERSION" ]; then
+        read -k 1 -s -t "$INPUT_TIMEOUT" key 2>/dev/null || key=""
+    else
+        read -n 1 -s -t "$INPUT_TIMEOUT" -r key 2>/dev/null || key=""
+    fi
+
+    # Check for escape sequence (arrow keys)
+    if [[ "$key" == $'\x1b' ]]; then
+        read -n 1 -s -t 0.1 extra 2>/dev/null || extra=""
+        if [[ "$extra" == "[" ]] || [[ "$extra" == "O" ]]; then
+            read -n 1 -s -t 0.1 extra 2>/dev/null || extra=""
+            case "$extra" in
+                A) echo "UP" ;;
+                B) echo "DOWN" ;;
+                *) echo "" ;;
+            esac
+            return
+        fi
+    fi
+
+    echo "$key"
+}
+
 # Interactive menu if no mode specified
 if [ -z "$MODE" ]; then
     while true; do
         show_header
         show_menu
 
-        # Read with timeout
-        if [ -n "$ZSH_VERSION" ]; then
-            read -k 1 -s -t "$INPUT_TIMEOUT" key 2>/dev/null || key=""
-        else
-            read -n 1 -s -t "$INPUT_TIMEOUT" -r key 2>/dev/null || key=""
-        fi
+        key=$(read_key)
 
         case $key in
-            1) MODE="web"; break ;;
-            2) MODE="electron"; break ;;
-            3) MODE="electron-debug"; break ;;
+            UP)
+                SELECTED_OPTION=$((SELECTED_OPTION - 1))
+                [ $SELECTED_OPTION -lt 1 ] && SELECTED_OPTION=$MAX_OPTIONS
+                ;;
+            DOWN)
+                SELECTED_OPTION=$((SELECTED_OPTION + 1))
+                [ $SELECTED_OPTION -gt $MAX_OPTIONS ] && SELECTED_OPTION=1
+                ;;
+            1) SELECTED_OPTION=1; MODE="web"; break ;;
+            2) SELECTED_OPTION=2; MODE="electron"; break ;;
+            3) SELECTED_OPTION=3; MODE="docker"; break ;;
+            4) SELECTED_OPTION=4; MODE="docker-electron"; break ;;
+            ""|$'\n'|$'\r')
+                # Enter key - select current option
+                case $SELECTED_OPTION in
+                    1) MODE="web" ;;
+                    2) MODE="electron" ;;
+                    3) MODE="docker" ;;
+                    4) MODE="docker-electron" ;;
+                esac
+                break
+                ;;
             q|Q)
                 echo ""
                 echo ""
-                local msg="Goodbye! See you soon."
-                center_text "${C_MUTE}${msg}${RESET}"
+                center_text "${C_MUTE}Goodbye! See you soon.${RESET}"
                 echo ""
                 exit 0
                 ;;
@@ -453,13 +934,25 @@ fi
 case $MODE in
     web) MODE_NAME="Web Browser" ;;
     electron) MODE_NAME="Desktop App" ;;
-    electron-debug) MODE_NAME="Desktop (Debug)" ;;
+    docker) MODE_NAME="Docker Dev" ;;
+    docker-electron) MODE_NAME="Electron + Docker" ;;
     *)
         echo "${C_RED}Error:${RESET} Invalid mode '$MODE'"
-        echo "Valid modes: web, electron, electron-debug"
+        echo "Valid modes: web, electron, docker, docker-electron"
         exit 1
         ;;
 esac
+
+# Check Docker for Docker modes
+if [[ "$MODE" == "docker" || "$MODE" == "docker-electron" ]]; then
+    show_cursor
+    stty echo 2>/dev/null || true
+    if ! check_docker; then
+        exit 1
+    fi
+    hide_cursor
+    stty -echo 2>/dev/null || true
+fi
 
 # Save to history
 save_mode_to_history "$MODE"
@@ -467,9 +960,153 @@ save_mode_to_history "$MODE"
 # Launch sequence
 launch_sequence "$MODE_NAME"
 
-# Execute the appropriate npm command
+# Restore terminal state before running npm
+show_cursor
+stty echo 2>/dev/null || true
+
+# Execute the appropriate command
 case $MODE in
-    web) npm run dev:web ;;
-    electron) npm run dev:electron ;;
-    electron-debug) npm run dev:electron:debug ;;
+    web)
+        export TEST_PORT="$WEB_PORT"
+        export VITE_SERVER_URL="http://localhost:$SERVER_PORT"
+        npm run dev:web
+        ;;
+    electron)
+        npm run dev:electron
+        ;;
+    docker)
+        # Check for running Electron (user might be switching from option 4)
+        check_running_electron
+
+        # Check for running containers
+        check_running_containers "docker-compose.dev.yml"
+        container_check=$?
+
+        if [ $container_check -eq 2 ]; then
+            # Attach to existing containers
+            center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+            center_print "Attaching to Docker Dev Containers" "$C_PRI"
+            center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+            echo ""
+            center_print "UI:  http://localhost:$DEFAULT_WEB_PORT" "$C_GREEN"
+            center_print "API: http://localhost:$DEFAULT_SERVER_PORT" "$C_GREEN"
+            center_print "Press Ctrl+C to detach" "$C_MUTE"
+            echo ""
+            if [ -f "docker-compose.override.yml" ]; then
+                docker compose -f docker-compose.dev.yml -f docker-compose.override.yml logs -f
+            else
+                docker compose -f docker-compose.dev.yml logs -f
+            fi
+        else
+            echo ""
+            center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+            center_print "Docker Development Mode" "$C_PRI"
+            center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+            echo ""
+            center_print "Starting UI + Server containers..." "$C_MUTE"
+            center_print "Source code is volume mounted for live reload" "$C_MUTE"
+            echo ""
+            center_print "UI:  http://localhost:$DEFAULT_WEB_PORT" "$C_GREEN"
+            center_print "API: http://localhost:$DEFAULT_SERVER_PORT" "$C_GREEN"
+            echo ""
+            center_print "First run may take several minutes (building image + npm install)" "$C_YELLOW"
+            center_print "Press Ctrl+C to stop" "$C_MUTE"
+            echo ""
+            center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+            echo ""
+            if [ -f "docker-compose.override.yml" ]; then
+                docker compose -f docker-compose.dev.yml -f docker-compose.override.yml up --build
+            else
+                docker compose -f docker-compose.dev.yml up --build
+            fi
+        fi
+        ;;
+    docker-electron)
+        # Check for running Electron (user might be switching from option 2)
+        check_running_electron
+
+        # Check for running containers
+        check_running_containers "docker-compose.dev-server.yml"
+        container_check=$?
+
+        echo ""
+        center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+        center_print "Electron + Docker API Mode" "$C_PRI"
+        center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+        echo ""
+        center_print "Server runs in Docker container" "$C_MUTE"
+        center_print "Electron runs locally on your machine" "$C_MUTE"
+        echo ""
+        center_print "API: http://localhost:$DEFAULT_SERVER_PORT (Docker)" "$C_GREEN"
+        echo ""
+
+        # If attaching to existing, skip the build
+        if [ $container_check -eq 2 ]; then
+            center_print "Using existing server container..." "$C_MUTE"
+        else
+            center_print "First run may take several minutes (building image + npm install)" "$C_YELLOW"
+        fi
+        echo ""
+        center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+        echo ""
+
+        # Start docker in background (or skip if attaching)
+        if [ $container_check -eq 2 ]; then
+            center_print "Checking if server is healthy..." "$C_MUTE"
+            DOCKER_PID=""
+        else
+            center_print "Starting Docker server container..." "$C_MUTE"
+            echo ""
+            if [ -f "docker-compose.override.yml" ]; then
+                docker compose -f docker-compose.dev-server.yml -f docker-compose.override.yml up --build &
+            else
+                docker compose -f docker-compose.dev-server.yml up --build &
+            fi
+            DOCKER_PID=$!
+        fi
+
+        # Wait for server to be healthy
+        echo ""
+        center_print "Waiting for server to become healthy..." "$C_YELLOW"
+        center_print "(This may take a while on first run)" "$C_MUTE"
+        echo ""
+        max_retries=180
+        server_ready=false
+        dots=""
+        for ((i=0; i<max_retries; i++)); do
+            if curl -s "http://localhost:$DEFAULT_SERVER_PORT/api/health" > /dev/null 2>&1; then
+                server_ready=true
+                break
+            fi
+            sleep 1
+            if (( i > 0 && i % 10 == 0 )); then
+                dots="${dots}."
+                center_print "Still waiting${dots}" "$C_MUTE"
+            fi
+        done
+        echo ""
+
+        if [ "$server_ready" = false ]; then
+            center_print "✗ Server container failed to become healthy" "$C_RED"
+            center_print "Check Docker logs above for errors" "$C_MUTE"
+            [ -n "$DOCKER_PID" ] && kill $DOCKER_PID 2>/dev/null || true
+            exit 1
+        fi
+
+        center_print "✓ Server is healthy!" "$C_GREEN"
+        echo ""
+        center_print "Building packages and launching Electron..." "$C_MUTE"
+        echo ""
+
+        # Build packages and launch Electron
+        npm run build:packages
+        SKIP_EMBEDDED_SERVER=true PORT=$DEFAULT_SERVER_PORT VITE_SERVER_URL="http://localhost:$DEFAULT_SERVER_PORT" npm run _dev:electron
+
+        # Cleanup docker when electron exits
+        echo ""
+        center_print "Shutting down Docker container..." "$C_MUTE"
+        [ -n "$DOCKER_PID" ] && kill $DOCKER_PID 2>/dev/null || true
+        docker compose -f docker-compose.dev-server.yml down 2>/dev/null || true
+        center_print "Done!" "$C_GREEN"
+        ;;
 esac

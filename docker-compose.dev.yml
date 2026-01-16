@@ -44,6 +44,7 @@ services:
       - NODE_ENV=development
       - PORT=3008
       - CORS_ORIGIN=http://localhost:3007
+      - HUSKY=0
 
       # Optional - restrict to specific directory within container
       - ALLOWED_ROOT_DIRECTORY=${ALLOWED_ROOT_DIRECTORY:-/projects}
@@ -112,6 +113,7 @@ services:
       - TEST_PORT=3007
       - VITE_SKIP_ELECTRON=true
       - VITE_APP_MODE=3
+      - HUSKY=0
     volumes:
       # Mount source code for live reload
       - .:/app:cached
