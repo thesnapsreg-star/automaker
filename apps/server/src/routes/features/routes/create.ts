@@ -4,10 +4,11 @@
 
 import type { Request, Response } from 'express';
 import { FeatureLoader } from '../../../services/feature-loader.js';
+import type { EventEmitter } from '../../../lib/events.js';
 import type { Feature } from '@automaker/types';
 import { getErrorMessage, logError } from '../common.js';
 
-export function createCreateHandler(featureLoader: FeatureLoader) {
+export function createCreateHandler(featureLoader: FeatureLoader, events?: EventEmitter) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectPath, feature } = req.body as {
@@ -24,6 +25,16 @@ export function createCreateHandler(featureLoader: FeatureLoader) {
       }
 
       const created = await featureLoader.create(projectPath, feature);
+
+      // Emit feature_created event for hooks
+      if (events) {
+        events.emit('feature:created', {
+          featureId: created.id,
+          featureName: created.name,
+          projectPath,
+        });
+      }
+
       res.json({ success: true, feature: created });
     } catch (error) {
       logError(error, 'Create feature failed');

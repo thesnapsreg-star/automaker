@@ -550,6 +550,88 @@ export interface SaveImageResult {
   error?: string;
 }
 
+// Notifications API interface
+import type {
+  Notification,
+  StoredEvent,
+  StoredEventSummary,
+  EventHistoryFilter,
+  EventReplayResult,
+} from '@automaker/types';
+
+export interface NotificationsAPI {
+  list: (projectPath: string) => Promise<{
+    success: boolean;
+    notifications?: Notification[];
+    error?: string;
+  }>;
+  getUnreadCount: (projectPath: string) => Promise<{
+    success: boolean;
+    count?: number;
+    error?: string;
+  }>;
+  markAsRead: (
+    projectPath: string,
+    notificationId?: string
+  ) => Promise<{
+    success: boolean;
+    notification?: Notification;
+    count?: number;
+    error?: string;
+  }>;
+  dismiss: (
+    projectPath: string,
+    notificationId?: string
+  ) => Promise<{
+    success: boolean;
+    dismissed?: boolean;
+    count?: number;
+    error?: string;
+  }>;
+}
+
+// Event History API interface
+export interface EventHistoryAPI {
+  list: (
+    projectPath: string,
+    filter?: EventHistoryFilter
+  ) => Promise<{
+    success: boolean;
+    events?: StoredEventSummary[];
+    total?: number;
+    error?: string;
+  }>;
+  get: (
+    projectPath: string,
+    eventId: string
+  ) => Promise<{
+    success: boolean;
+    event?: StoredEvent;
+    error?: string;
+  }>;
+  delete: (
+    projectPath: string,
+    eventId: string
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+  clear: (projectPath: string) => Promise<{
+    success: boolean;
+    cleared?: number;
+    error?: string;
+  }>;
+  replay: (
+    projectPath: string,
+    eventId: string,
+    hookIds?: string[]
+  ) => Promise<{
+    success: boolean;
+    result?: EventReplayResult;
+    error?: string;
+  }>;
+}
+
 export interface ElectronAPI {
   ping: () => Promise<string>;
   getApiKey?: () => Promise<string | null>;
@@ -760,6 +842,8 @@ export interface ElectronAPI {
     }>;
   };
   ideation?: IdeationAPI;
+  notifications?: NotificationsAPI;
+  eventHistory?: EventHistoryAPI;
   codex?: {
     getUsage: () => Promise<CodexUsageResponse>;
     getModels: (refresh?: boolean) => Promise<{

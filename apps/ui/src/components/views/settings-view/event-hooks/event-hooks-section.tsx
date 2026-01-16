@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { Webhook, Plus, Trash2, Pencil, Terminal, Globe } from 'lucide-react';
+import { Webhook, Plus, Trash2, Pencil, Terminal, Globe, History } from 'lucide-react';
 import { useAppStore } from '@/store/app-store';
 import type { EventHook, EventHookTrigger } from '@automaker/types';
 import { EVENT_HOOK_TRIGGER_LABELS } from '@automaker/types';
 import { EventHookDialog } from './event-hook-dialog';
+import { EventHistoryView } from './event-history-view';
 
 export function EventHooksSection() {
   const { eventHooks, setEventHooks } = useAppStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingHook, setEditingHook] = useState<EventHook | null>(null);
+  const [activeTab, setActiveTab] = useState<'hooks' | 'history'>('hooks');
 
   const handleAddHook = () => {
     setEditingHook(null);
@@ -78,58 +81,85 @@ export function EventHooksSection() {
               </p>
             </div>
           </div>
-          <Button onClick={handleAddHook} size="sm" className="gap-2">
-            <Plus className="w-4 h-4" />
-            Add Hook
-          </Button>
+          {activeTab === 'hooks' && (
+            <Button onClick={handleAddHook} size="sm" className="gap-2">
+              <Plus className="w-4 h-4" />
+              Add Hook
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-6">
-        {eventHooks.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Webhook className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No event hooks configured</p>
-            <p className="text-xs mt-1">
-              Add hooks to run commands or send webhooks when features complete
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Group by trigger type */}
-            {Object.entries(hooksByTrigger).map(([trigger, hooks]) => (
-              <div key={trigger} className="space-y-3">
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  {EVENT_HOOK_TRIGGER_LABELS[trigger as EventHookTrigger]}
-                </h3>
-                <div className="space-y-2">
-                  {hooks.map((hook) => (
-                    <HookCard
-                      key={hook.id}
-                      hook={hook}
-                      onEdit={() => handleEditHook(hook)}
-                      onDelete={() => handleDeleteHook(hook.id)}
-                      onToggle={(enabled) => handleToggleHook(hook.id, enabled)}
-                    />
-                  ))}
-                </div>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'hooks' | 'history')}>
+        <div className="px-6 pt-4">
+          <TabsList className="grid w-full max-w-xs grid-cols-2">
+            <TabsTrigger value="hooks" className="gap-2">
+              <Webhook className="w-4 h-4" />
+              Hooks
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2">
+              <History className="w-4 h-4" />
+              History
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Hooks Tab */}
+        <TabsContent value="hooks" className="m-0">
+          <div className="p-6 pt-4">
+            {eventHooks.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Webhook className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">No event hooks configured</p>
+                <p className="text-xs mt-1">
+                  Add hooks to run commands or send webhooks when features complete
+                </p>
               </div>
-            ))}
+            ) : (
+              <div className="space-y-6">
+                {/* Group by trigger type */}
+                {Object.entries(hooksByTrigger).map(([trigger, hooks]) => (
+                  <div key={trigger} className="space-y-3">
+                    <h3 className="text-sm font-medium text-muted-foreground">
+                      {EVENT_HOOK_TRIGGER_LABELS[trigger as EventHookTrigger]}
+                    </h3>
+                    <div className="space-y-2">
+                      {hooks.map((hook) => (
+                        <HookCard
+                          key={hook.id}
+                          hook={hook}
+                          onEdit={() => handleEditHook(hook)}
+                          onDelete={() => handleDeleteHook(hook.id)}
+                          onToggle={(enabled) => handleToggleHook(hook.id, enabled)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Variable reference */}
-      <div className="px-6 pb-6">
-        <div className="rounded-lg bg-muted/30 p-4 text-xs text-muted-foreground">
-          <p className="font-medium mb-2">Available variables:</p>
-          <code className="text-[10px] leading-relaxed">
-            {'{{featureId}}'} {'{{featureName}}'} {'{{projectPath}}'} {'{{projectName}}'}{' '}
-            {'{{error}}'} {'{{timestamp}}'} {'{{eventType}}'}
-          </code>
-        </div>
-      </div>
+          {/* Variable reference */}
+          <div className="px-6 pb-6">
+            <div className="rounded-lg bg-muted/30 p-4 text-xs text-muted-foreground">
+              <p className="font-medium mb-2">Available variables:</p>
+              <code className="text-[10px] leading-relaxed">
+                {'{{featureId}}'} {'{{featureName}}'} {'{{projectPath}}'} {'{{projectName}}'}{' '}
+                {'{{error}}'} {'{{timestamp}}'} {'{{eventType}}'}
+              </code>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* History Tab */}
+        <TabsContent value="history" className="m-0">
+          <div className="p-6 pt-4">
+            <EventHistoryView />
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Dialog */}
       <EventHookDialog

@@ -60,6 +60,7 @@ import {
   getMCPServersFromSettings,
   getPromptCustomization,
 } from '../lib/settings-helpers.js';
+import { getNotificationService } from './notification-service.js';
 
 const execAsync = promisify(exec);
 
@@ -386,6 +387,7 @@ export class AutoModeService {
       this.emitAutoModeEvent('auto_mode_error', {
         error: errorInfo.message,
         errorType: errorInfo.type,
+        projectPath,
       });
     });
   }
@@ -1547,6 +1549,7 @@ Address the follow-up instructions above. Review the previous work and make the 
       message: allPassed
         ? 'All verification checks passed'
         : `Verification failed: ${results.find((r) => !r.passed)?.check || 'Unknown'}`,
+      projectPath,
     });
 
     return allPassed;
@@ -1620,6 +1623,7 @@ Address the follow-up instructions above. Review the previous work and make the 
         featureId,
         passes: true,
         message: `Changes committed: ${hash.trim().substring(0, 8)}`,
+        projectPath,
       });
 
       return hash.trim();
@@ -2101,6 +2105,26 @@ Format your response as a structured markdown document.`;
         feature.justFinishedAt = undefined;
       }
       await secureFs.writeFile(featurePath, JSON.stringify(feature, null, 2));
+
+      // Create notifications for important status changes
+      const notificationService = getNotificationService();
+      if (status === 'waiting_approval') {
+        await notificationService.createNotification({
+          type: 'feature_waiting_approval',
+          title: 'Feature Ready for Review',
+          message: `"${feature.name || featureId}" is ready for your review and approval.`,
+          featureId,
+          projectPath,
+        });
+      } else if (status === 'verified') {
+        await notificationService.createNotification({
+          type: 'feature_verified',
+          title: 'Feature Verified',
+          message: `"${feature.name || featureId}" has been verified and is complete.`,
+          featureId,
+          projectPath,
+        });
+      }
     } catch {
       // Feature file may not exist
     }

@@ -39,6 +39,7 @@ interface EventHookDialogProps {
 type ActionType = 'shell' | 'http';
 
 const TRIGGER_OPTIONS: EventHookTrigger[] = [
+  'feature_created',
   'feature_success',
   'feature_error',
   'auto_mode_complete',

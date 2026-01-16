@@ -7,6 +7,7 @@ import { useOSDetection } from '@/hooks/use-os-detection';
 import { ProjectSwitcherItem } from './components/project-switcher-item';
 import { ProjectContextMenu } from './components/project-context-menu';
 import { EditProjectDialog } from './components/edit-project-dialog';
+import { NotificationBell } from './components/notification-bell';
 import { NewProjectModal } from '@/components/dialogs/new-project-modal';
 import { OnboardingDialog } from '@/components/layout/sidebar/dialogs';
 import { useProjectCreation, useProjectTheme } from '@/components/layout/sidebar/hooks';
@@ -327,6 +328,11 @@ export function ProjectSwitcher() {
               v{appVersion} {versionSuffix}
             </span>
           </button>
+
+          {/* Notification Bell */}
+          <div className="flex justify-center mt-2">
+            <NotificationBell projectPath={currentProject?.path ?? null} />
+          </div>
           <div className="w-full h-px bg-border mt-3" />
         </div>
 

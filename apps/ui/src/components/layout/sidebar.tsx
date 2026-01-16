@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from '@tanstack/react-router';
 const logger = createLogger('Sidebar');
 import { cn } from '@/lib/utils';
 import { useAppStore, type ThemeMode } from '@/store/app-store';
+import { useNotificationsStore } from '@/store/notifications-store';
 import { useKeyboardShortcuts, useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { getElectronAPI } from '@/lib/electron';
 import { initializeProject, hasAppSpec, hasAutomakerDir } from '@/lib/project-init';
@@ -61,6 +62,9 @@ export function Sidebar() {
 
   // Get customizable keyboard shortcuts
   const shortcuts = useKeyboardShortcutsConfig();
+
+  // Get unread notifications count
+  const unreadNotificationsCount = useNotificationsStore((s) => s.unreadCount);
 
   // State for delete project confirmation dialog
   const [showDeleteProjectDialog, setShowDeleteProjectDialog] = useState(false);
@@ -238,6 +242,7 @@ export function Sidebar() {
     cyclePrevProject,
     cycleNextProject,
     unviewedValidationsCount,
+    unreadNotificationsCount,
     isSpecGenerating: isCurrentProjectGeneratingSpec,
   });
 

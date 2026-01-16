@@ -32,7 +32,10 @@ import type {
   CreateIdeaInput,
   UpdateIdeaInput,
   ConvertToFeatureOptions,
+  NotificationsAPI,
+  EventHistoryAPI,
 } from './electron';
+import type { EventHistoryFilter } from '@automaker/types';
 import type { Message, SessionListItem } from '@/types/electron';
 import type { Feature, ClaudeUsageResponse, CodexUsageResponse } from '@/store/app-store';
 import type { WorktreeAPI, GitAPI, ModelDefinition, ProviderStatus } from '@/types/electron';
@@ -514,7 +517,8 @@ type EventType =
   | 'worktree:init-completed'
   | 'dev-server:started'
   | 'dev-server:output'
-  | 'dev-server:stopped';
+  | 'dev-server:stopped'
+  | 'notification:created';
 
 /**
  * Dev server log event payloads for WebSocket streaming
@@ -2438,6 +2442,43 @@ export class HttpApiClient implements ElectronAPI {
     onAnalysisEvent: (callback: (event: any) => void): (() => void) => {
       return this.subscribeToEvent('ideation:analysis', callback as EventCallback);
     },
+  };
+
+  // Notifications API - project-level notifications
+  notifications: NotificationsAPI & {
+    onNotificationCreated: (callback: (notification: any) => void) => () => void;
+  } = {
+    list: (projectPath: string) => this.post('/api/notifications/list', { projectPath }),
+
+    getUnreadCount: (projectPath: string) =>
+      this.post('/api/notifications/unread-count', { projectPath }),
+
+    markAsRead: (projectPath: string, notificationId?: string) =>
+      this.post('/api/notifications/mark-read', { projectPath, notificationId }),
+
+    dismiss: (projectPath: string, notificationId?: string) =>
+      this.post('/api/notifications/dismiss', { projectPath, notificationId }),
+
+    onNotificationCreated: (callback: (notification: any) => void): (() => void) => {
+      return this.subscribeToEvent('notification:created', callback as EventCallback);
+    },
+  };
+
+  // Event History API - stored events for debugging and replay
+  eventHistory: EventHistoryAPI = {
+    list: (projectPath: string, filter?: EventHistoryFilter) =>
+      this.post('/api/event-history/list', { projectPath, filter }),
+
+    get: (projectPath: string, eventId: string) =>
+      this.post('/api/event-history/get', { projectPath, eventId }),
+
+    delete: (projectPath: string, eventId: string) =>
+      this.post('/api/event-history/delete', { projectPath, eventId }),
+
+    clear: (projectPath: string) => this.post('/api/event-history/clear', { projectPath }),
+
+    replay: (projectPath: string, eventId: string, hookIds?: string[]) =>
+      this.post('/api/event-history/replay', { projectPath, eventId, hookIds }),
   };
 
   // MCP API - Test MCP server connections and list tools

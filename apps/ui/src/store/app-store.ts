@@ -233,6 +233,7 @@ export interface KeyboardShortcuts {
   settings: string;
   terminal: string;
   ideation: string;
+  notifications: string;
   githubIssues: string;
   githubPrs: string;
 
@@ -268,6 +269,7 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   settings: 'S',
   terminal: 'T',
   ideation: 'I',
+  notifications: 'X',
   githubIssues: 'G',
   githubPrs: 'R',
 

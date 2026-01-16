@@ -8,6 +8,7 @@ import type { EventEmitter } from '../../lib/events.js';
 import { createLogger } from '@automaker/utils';
 import { getFeaturesDir } from '@automaker/platform';
 import { extractJsonWithArray } from '../../lib/json-extractor.js';
+import { getNotificationService } from '../../services/notification-service.js';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -86,6 +87,15 @@ export async function parseAndCreateFeatures(
     events.emit('spec-regeneration:event', {
       type: 'spec_regeneration_complete',
       message: `Spec regeneration complete! Created ${createdFeatures.length} features.`,
+      projectPath: projectPath,
+    });
+
+    // Create notification for spec generation completion
+    const notificationService = getNotificationService();
+    await notificationService.createNotification({
+      type: 'spec_regeneration_complete',
+      title: 'Spec Generation Complete',
+      message: `Created ${createdFeatures.length} features from the project specification.`,
       projectPath: projectPath,
     });
   } catch (error) {

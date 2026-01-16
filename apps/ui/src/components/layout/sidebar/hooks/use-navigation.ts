@@ -11,6 +11,7 @@ import {
   Lightbulb,
   Brain,
   Network,
+  Bell,
 } from 'lucide-react';
 import type { NavSection, NavItem } from '../types';
 import type { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
@@ -35,6 +36,7 @@ interface UseNavigationProps {
     ideation: string;
     githubIssues: string;
     githubPrs: string;
+    notifications: string;
   };
   hideSpecEditor: boolean;
   hideContext: boolean;
@@ -49,6 +51,8 @@ interface UseNavigationProps {
   cycleNextProject: () => void;
   /** Count of unviewed validations to show on GitHub Issues nav item */
   unviewedValidationsCount?: number;
+  /** Count of unread notifications to show on Notifications nav item */
+  unreadNotificationsCount?: number;
   /** Whether spec generation is currently running for the current project */
   isSpecGenerating?: boolean;
 }
@@ -67,6 +71,7 @@ export function useNavigation({
   cyclePrevProject,
   cycleNextProject,
   unviewedValidationsCount,
+  unreadNotificationsCount,
   isSpecGenerating,
 }: UseNavigationProps) {
   // Track if current project has a GitHub remote
@@ -199,6 +204,20 @@ export function useNavigation({
       });
     }
 
+    // Add Other section with notifications
+    sections.push({
+      label: 'Other',
+      items: [
+        {
+          id: 'notifications',
+          label: 'Notifications',
+          icon: Bell,
+          shortcut: shortcuts.notifications,
+          count: unreadNotificationsCount,
+        },
+      ],
+    });
+
     return sections;
   }, [
     shortcuts,
@@ -207,6 +226,7 @@ export function useNavigation({
     hideTerminal,
     hasGitHubRemote,
     unviewedValidationsCount,
+    unreadNotificationsCount,
     isSpecGenerating,
   ]);
 

@@ -108,12 +108,14 @@ export type ModelProvider = 'claude' | 'cursor' | 'codex' | 'opencode';
 /**
  * EventHookTrigger - Event types that can trigger custom hooks
  *
+ * - feature_created: A new feature was created
  * - feature_success: Feature completed successfully
  * - feature_error: Feature failed with an error
  * - auto_mode_complete: Auto mode finished processing all features
  * - auto_mode_error: Auto mode encountered a critical error and paused
  */
 export type EventHookTrigger =
+  | 'feature_created'
   | 'feature_success'
   | 'feature_error'
   | 'auto_mode_complete'
@@ -186,6 +188,7 @@ export interface EventHook {
 
 /** Human-readable labels for event hook triggers */
 export const EVENT_HOOK_TRIGGER_LABELS: Record<EventHookTrigger, string> = {
+  feature_created: 'Feature created',
   feature_success: 'Feature completed successfully',
   feature_error: 'Feature failed with error',
   auto_mode_complete: 'Auto mode completed all features',
@@ -298,6 +301,8 @@ export interface KeyboardShortcuts {
   settings: string;
   /** Open terminal */
   terminal: string;
+  /** Open notifications */
+  notifications: string;
   /** Toggle sidebar visibility */
   toggleSidebar: string;
   /** Add new feature */
@@ -800,6 +805,7 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   context: 'C',
   settings: 'S',
   terminal: 'T',
+  notifications: 'X',
   toggleSidebar: '`',
   addFeature: 'N',
   addContextFile: 'N',

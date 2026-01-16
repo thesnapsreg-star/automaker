@@ -5,7 +5,10 @@
  * - Shell commands: Executed with configurable timeout
  * - HTTP webhooks: POST/GET/PUT/PATCH requests with variable substitution
  *
+ * Also stores events to history for debugging and replay.
+ *
  * Supported events:
+ * - feature_created: A new feature was created
  * - feature_success: Feature completed successfully
  * - feature_error: Feature failed with an error
  * - auto_mode_complete: Auto mode finished all features (idle state)
@@ -17,6 +20,7 @@ import { promisify } from 'util';
 import { createLogger } from '@automaker/utils';
 import type { EventEmitter } from '../lib/events.js';
 import type { SettingsService } from './settings-service.js';
+import type { EventHistoryService } from './event-history-service.js';
 import type {
   EventHook,
   EventHookTrigger,
@@ -61,26 +65,44 @@ interface AutoModeEventPayload {
 }
 
 /**
+ * Feature created event payload structure
+ */
+interface FeatureCreatedPayload {
+  featureId: string;
+  featureName?: string;
+  projectPath: string;
+}
+
+/**
  * Event Hook Service
  *
  * Manages execution of user-configured event hooks in response to system events.
+ * Also stores events to history for debugging and replay.
  */
 export class EventHookService {
   private emitter: EventEmitter | null = null;
   private settingsService: SettingsService | null = null;
+  private eventHistoryService: EventHistoryService | null = null;
   private unsubscribe: (() => void) | null = null;
 
   /**
-   * Initialize the service with event emitter and settings service
+   * Initialize the service with event emitter, settings service, and event history service
    */
-  initialize(emitter: EventEmitter, settingsService: SettingsService): void {
+  initialize(
+    emitter: EventEmitter,
+    settingsService: SettingsService,
+    eventHistoryService?: EventHistoryService
+  ): void {
     this.emitter = emitter;
     this.settingsService = settingsService;
+    this.eventHistoryService = eventHistoryService || null;
 
-    // Subscribe to auto-mode events
+    // Subscribe to events
     this.unsubscribe = emitter.subscribe((type, payload) => {
       if (type === 'auto-mode:event') {
         this.handleAutoModeEvent(payload as AutoModeEventPayload);
+      } else if (type === 'feature:created') {
+        this.handleFeatureCreatedEvent(payload as FeatureCreatedPayload);
       }
     });
 
@@ -97,6 +119,7 @@ export class EventHookService {
     }
     this.emitter = null;
     this.settingsService = null;
+    this.eventHistoryService = null;
   }
 
   /**
@@ -137,17 +160,51 @@ export class EventHookService {
       eventType: trigger,
     };
 
-    // Execute matching hooks
-    await this.executeHooksForTrigger(trigger, context);
+    // Execute matching hooks (pass passes for feature completion events)
+    await this.executeHooksForTrigger(trigger, context, { passes: payload.passes });
   }
 
   /**
-   * Execute all enabled hooks matching the given trigger
+   * Handle feature:created events and trigger matching hooks
+   */
+  private async handleFeatureCreatedEvent(payload: FeatureCreatedPayload): Promise<void> {
+    const context: HookContext = {
+      featureId: payload.featureId,
+      featureName: payload.featureName,
+      projectPath: payload.projectPath,
+      projectName: this.extractProjectName(payload.projectPath),
+      timestamp: new Date().toISOString(),
+      eventType: 'feature_created',
+    };
+
+    await this.executeHooksForTrigger('feature_created', context);
+  }
+
+  /**
+   * Execute all enabled hooks matching the given trigger and store event to history
    */
   private async executeHooksForTrigger(
     trigger: EventHookTrigger,
-    context: HookContext
+    context: HookContext,
+    additionalData?: { passes?: boolean }
   ): Promise<void> {
+    // Store event to history (even if no hooks match)
+    if (this.eventHistoryService && context.projectPath) {
+      try {
+        await this.eventHistoryService.storeEvent({
+          trigger,
+          projectPath: context.projectPath,
+          featureId: context.featureId,
+          featureName: context.featureName,
+          error: context.error,
+          errorType: context.errorType,
+          passes: additionalData?.passes,
+        });
+      } catch (error) {
+        logger.error('Failed to store event to history:', error);
+      }
+    }
+
     if (!this.settingsService) {
       logger.warn('Settings service not available');
       return;
