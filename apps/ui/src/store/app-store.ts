@@ -1440,7 +1440,7 @@ const initialState: AppState = {
     defaultFontSize: 14,
     defaultRunScript: '',
     screenReaderMode: false,
-    fontFamily: "Menlo, Monaco, 'Courier New', monospace",
+    fontFamily: DEFAULT_FONT_VALUE,
     scrollbackLines: 5000,
     lineHeight: 1.0,
     maxSessions: 100,
